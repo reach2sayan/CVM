@@ -1,0 +1,36 @@
+#!/bin/csh
+
+touch rep.tmp str.out pos.tmp atoms_rep.tmp atoms.tmp
+foreach tryposcar (POSCAR POSCAR.temp)
+  set poscar=$tryposcar
+  if ( -e $poscar ) then
+    break
+  endif
+end
+
+if ( ! -e  $poscar ) then
+  echo Cannot find POSCAR.temp or POSCAR
+  exit 1
+endif
+
+grep TITEL elements | sed 's/.*=//g' | awk '{print $1}' | sed 's/_.*//g' >! atoms.tmp
+tail -n +6 $poscar | head -1 | blanktonl >! rep.tmp
+grep -q -e '[a-z'] -e '[A-Z]' rep.tmp
+if ( $status == 0 ) then
+  tail -n +7 $poscar | head -1 | blanktonl >! rep.tmp
+endif
+paste atoms.tmp rep.tmp | awk '{for (i=1; i<=$2+0; i++) {print $1;}}' >! atoms_rep.tmp
+rm -f atoms.tmp rep.tmp
+
+tail -n +2 $poscar | getlines -jaf '^[DdCc]' | awk '{print $1,$2,$3}' | getlines -jbf '^ *$' | getlines -jbf 'Lattice' >! pos.tmp
+tail -n +2 $poscar | grep -q "^[cC]"
+if ( $status == 1 ) then
+  tail -n +2 $poscar | head -4 | awk 'BEGIN {getline; s=$1} {print s*$1,s*$2,s*$3}' >! str.out
+  ( echo 1 0 0 ; echo 0 1 0 ; echo 0 0 1 ) >> str.out
+else
+  ( echo 1 0 0 ; echo 0 1 0 ; echo 0 0 1 ) >! str.out
+  tail -n +2 $poscar | head -4 | awk 'BEGIN {getline; s=$1} {print s*$1,s*$2,s*$3}' >> str.out
+endif
+paste pos.tmp atoms_rep.tmp >> str.out
+
+rm -f pos.tmp
