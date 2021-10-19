@@ -71,7 +71,7 @@ dmypy.json
 .pyre/
 
 
-
+*.tex
 *.tmp
 *.temp
 *.out
