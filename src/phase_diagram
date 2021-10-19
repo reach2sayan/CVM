@@ -1,0 +1,213 @@
+#!/usr/bin/env python3
+
+import argparse
+import dataloader as dl
+from energyfunctions import F, F_jacobian, F_hessian
+import numpy as np
+from constraints import constraint_singlet, constraint_zero
+from ase.units import kB
+import optimiser as opt
+from tqdm import tqdm
+import pandas as pd
+import warnings
+
+if __name__ == '__main__':
+    
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--eci',
+                        default='eci.out', 
+                        help="file containing ECI's (default: %(default)s)",
+                       )
+    parser.add_argument('--vmat', 
+                        default='vmat.out',
+                        help="file containing the vmatrix (default: %(default)s)",
+                       )
+    parser.add_argument('--clusters',
+                        default='clusters.out',
+                        help="file contain the maximal cluster description (default: %(default)s)",
+                       )
+    parser.add_argument('--kb',
+                        default='kb.out',
+                        help="file containing the kikuchi-barker coefficients (default: %(default)s)",
+                       )
+    parser.add_argument('--configcoef',
+                        default='configcoef.out',
+                        help="file containing coefficient for each subcluster (default: %(default)s)",
+                       )
+    parser.add_argument('--configs','--config',
+                        default='config.out',
+                        help="file containing subcluster descriptions (default: %(default)s)",
+                       )
+    parser.add_argument('--Tmin',
+                        type=float,
+                        default=0,
+                        help="minimum T for phase diagram (default: %(default)s)",
+                       )
+    parser.add_argument('--Tmax',
+                        type=float,
+                        default=500.0,
+                        help="maximum T for phase diagram (default: %(default)s)",
+                       )
+    parser.add_argument('--nTemp',
+                        type=int,
+                        default=11,
+                        help="Number of data points between Tmin and Tmax (default: %(default)s)",
+                       )
+    parser.add_argument('--Xmin',
+                        type=float,
+                        default=-1+np.finfo(float).eps,
+                        help="minimum 1-point correlations (default: %(default).2f)",
+                       )
+    parser.add_argument('--Xmax',
+                        type=float,
+                        default=1-np.finfo(float).eps,
+                        help="maximum 1-point correlations (default: %(default).2f)",
+                       )
+    parser.add_argument('--ncorr',
+                        type=int,
+                        default=9,
+                        help="Number of data points between Xmin and Xmax (default: %(default)s)",
+                       )
+    parser.add_argument('--out',
+                        default='phasediagram_latest.csv',
+                        help="Name of the dataframe containing the result of the optimisation"
+                       )
+    parser.add_argument('--verbose', '-v', action='count', default=0,
+                        help="Indicate the verbosity of the fit (default: %(default)s)",
+                       )
+    parser.add_argument('--maxiter',
+                        default=3000,
+                        type=int,
+                        help="Indicate maximum iterations for the local optimiser (default: %(default)s)",
+                       )
+    parser.add_argument('--tolerance',
+                        default=1e-12,
+                        type=float,
+                        help="Indicate the acceptable difference between two iterations (default: %(default)s)",
+                       )
+    parser.add_argument('--global_trials',
+                        default=100,
+                        type=int,
+                        help="Indicate the number of initial point iteration for global minima search (default: %(default)s)",
+                       )
+    parser.add_argument('--uniform',
+                        action='store_true',
+                        default=True,
+                        help="Use uniform sampling to search global minima (default: %(default)s)",
+                       )
+    parser.add_argument('--basinhopping',
+                        action='store_true',
+                        default=False,
+                        help="Use basin hopping to search global minima",
+                       )
+    parser.add_argument('--show_warning',
+                        action='store_true',
+                        default=False,
+                        help="Enables to show warning",
+                       )
+
+    args = parser.parse_args()
+
+    if not args.show_warning:
+        warnings.filterwarnings("ignore")
+
+    clusters = dl.read_clusters(args.clusters)
+    kb = dl.read_kbcoeffs(args.kb)
+    configcoef = dl.read_configcoef(args.configcoef)
+    configs = dl.read_configs(args.configs)
+    vmat = dl.read_vmatrix(args.vmat)
+    eci = dl.read_eci(args.eci)
+    outfile = args.out
+    MIN_TEMP = args.Tmin
+    MAX_TEMP = args.Tmax
+    steps = args.nTemp
+    NUM_TRIALS = args.global_trials
+    num_clusters = len(clusters)
+
+    results_phasediagram = pd.DataFrame(columns = ['T', '1-point_corr', 'F','corrs'])
+
+    for temp in tqdm(np.linspace(MIN_TEMP, MAX_TEMP, num=steps)):
+        for FIXED_CORR_1 in tqdm(np.linspace(-1+np.finfo(float).eps, 1-np.finfo(float).eps, 9)):
+
+            if args.uniform:
+
+                constraints = [{'fun': constraint_singlet,
+                                'type':'eq',
+                                'args':[FIXED_CORR_1]
+                               },
+                               {'fun': constraint_zero,
+                                'type':'eq'
+                               }
+                              ]
+                options = {'verbose' : args.verbose,
+                           'maxiter' : args.maxiter,
+                           'xtol'    : args.tolerance,
+                           'initial_constr_penalty' : 10
+                          }
+                
+                result = opt.fit(F=F,
+                                 vmat=vmat, kb=kb, 
+                                 clusters=clusters, 
+                                 configs=configs, 
+                                 configcoef=configcoef,
+                                 temp=temp, 
+                                 eci=eci, 
+                                 options=options,
+                                 jac=F_jacobian,
+                                 hess=F_hessian,
+                                 constraints=constraints,
+                                 NUM_TRIALS=NUM_TRIALS,
+                                 FIXED_CORR_1=FIXED_CORR_1,
+                                 num_clusters=num_clusters
+                                )
+
+
+            results_phasediagram = results_phasediagram.append({'T' : temp, 
+                                                               '1-point_corr' : FIXED_CORR_1, 
+                                                               'F' : result.fun, 
+                                                               'corrs': result.x,
+                                                               }, 
+                                                               ignore_index = True
+                                                              )
+
+    corrcols = [f'corr {i}' for i in range(num_clusters)]
+    results_phasediagram[corrcols] = pd.DataFrame(results_phasediagram.corrs.tolist(), 
+                                                  index = results_phasediagram.index,
+                                                 )
+    results_phasediagram.drop(['corrs'],axis=1,inplace=True)
+
+    results_phasediagram.to_csv(outfile,index=False)
+    
+    #TODO: Add handler for plotting phase diagram
+    #plot_tool.plot_phasediagram(results_phasediagram)
+
+
+
+
+
+
+#corrs1 = np.array([1., 1., 1., 1., 1., 1.]) #Pure B
+#corrs0 = np.array([1., -1., 1., 1., -1., 1.]) #Pure A
+#corrssqs = np.array([1.    , 0.0   , 0.25,0.25  , 0.125 , 0.0625]) # AB - sqs
+#corrsrand = np.array([1.   , *np.random.uniform(-1, 1, 5)]) 
+#T = 1/kB
+#
+#f0 = F(corrs0, vmat, kb, clusters, configs, configcoef,T,eci)
+#f1 = F(corrs1, vmat, kb, clusters, configs, configcoef,T,eci)
+#fsqs = F(corrssqs, vmat, kb, clusters, configs, configcoef,T,eci)
+#frand = F(corrsrand, vmat, kb, clusters, configs, configcoef,T,eci)
+#print(f"Corrs 0: {f0:.2f} -- Corrs 1: {f1:.2f} -- Corrs Rand: {frand:.2f} -- Corrs SQS: {fsqs:.2f}")
+#
+#f_jaco0 = F_jacobian(corrs0, vmat, kb, clusters, configs, configcoef,T,eci)
+#f_jaco1 = F_jacobian(corrs1, vmat, kb, clusters, configs, configcoef,T,eci)
+#f_jacosqs = F_jacobian(corrssqs, vmat, kb, clusters, configs, configcoef,T,eci)
+#f_jacorand = F_jacobian(corrsrand, vmat, kb, clusters, configs, configcoef,T,eci)
+#print(f"Corrs 0: {f_jaco0} \nCorrs 1: {f_jaco1} \nCorrs Rand {f_jacorand} \nCorrs SQS {f_jacosqs}")
+#
+#f_hess0 = F_hessian(corrs0, vmat, kb, clusters, configs, configcoef,T,eci)
+#f_hess1 = F_hessian(corrs1, vmat, kb, clusters, configs, configcoef,T,eci)
+#f_hessrand = F_hessian(corrsrand, vmat, kb, clusters, configs, configcoef,T,eci)
+#f_hesssqs = F_hessian(corrssqs, vmat, kb, clusters, configs, configcoef,T,eci)
+#print(f"Corrs 0:\n {f_hess0} \n Corrs 1:\n {f_hess1}\n Corrs Rand:\n {f_hessrand} \n Corrs SQS:\n {f_hesssqs}")
+
+
