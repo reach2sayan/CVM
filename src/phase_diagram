@@ -4,11 +4,12 @@ import argparse
 import dataloader as dl
 from energyfunctions import F, F_jacobian, F_hessian
 import numpy as np
-from constraints import constraint_singlet, constraint_zero
 from ase.units import kB
 import optimiser as opt
 from tqdm import tqdm
 import pandas as pd
+from constraints import Constraints
+from bounds import CorrBounds
 import warnings
 
 if __name__ == '__main__':
@@ -120,46 +121,46 @@ if __name__ == '__main__':
     outfile = args.out
     MIN_TEMP = args.Tmin
     MAX_TEMP = args.Tmax
+    MIN_CORR = args.Xmin
+    MAX_CORR = args.Xmax
     steps = args.nTemp
     NUM_TRIALS = args.global_trials
     num_clusters = len(clusters)
 
     results_phasediagram = pd.DataFrame(columns = ['T', '1-point_corr', 'F','corrs'])
 
+    constraints = Constraints(clusters, configcoef, vmat)
+    bounds = CorrBounds(num_clusters)
+
+    options = {'verbose' : args.verbose,
+               'maxiter' : args.maxiter,
+               'xtol'    : args.tolerance,
+               'initial_constr_penalty' : 10
+              }
+
     for temp in tqdm(np.linspace(MIN_TEMP, MAX_TEMP, num=steps)):
-        for FIXED_CORR_1 in tqdm(np.linspace(-1+np.finfo(float).eps, 1-np.finfo(float).eps, 9)):
+        for FIXED_CORR_1 in tqdm(np.linspace(MIN_CORR, MAX_CORR, 9)):
 
-            if args.uniform:
+            constraints.get_constraints_phasediagram(FIXED_CORR_1)
+            constraints_pd = constraints.constraints
 
-                constraints = [{'fun': constraint_singlet,
-                                'type':'eq',
-                                'args':[FIXED_CORR_1]
-                               },
-                               {'fun': constraint_zero,
-                                'type':'eq'
-                               }
-                              ]
-                options = {'verbose' : args.verbose,
-                           'maxiter' : args.maxiter,
-                           'xtol'    : args.tolerance,
-                           'initial_constr_penalty' : 10
-                          }
-                
-                result = opt.fit(F=F,
-                                 vmat=vmat, kb=kb, 
-                                 clusters=clusters, 
-                                 configs=configs, 
-                                 configcoef=configcoef,
-                                 temp=temp, 
-                                 eci=eci, 
-                                 options=options,
-                                 jac=F_jacobian,
-                                 hess=F_hessian,
-                                 constraints=constraints,
-                                 NUM_TRIALS=NUM_TRIALS,
-                                 FIXED_CORR_1=FIXED_CORR_1,
-                                 num_clusters=num_clusters
-                                )
+            bounds_corrs = bounds.get_pd_bounds(FIXED_CORR_1)
+            result = opt.fit(F=F,
+                             vmat=vmat, kb=kb, 
+                             clusters=clusters, 
+                             configs=configs, 
+                             configcoef=configcoef,
+                             temp=temp, 
+                             eci=eci, 
+                             options=options,
+                             jac=F_jacobian,
+                             hess=F_hessian,
+                             NUM_TRIALS=NUM_TRIALS,
+                             FIXED_CORR_1=FIXED_CORR_1,
+                             bounds=bounds_corrs,
+                             constraints=constraints_pd,
+                             num_clusters=num_clusters
+                            )
 
 
             results_phasediagram = results_phasediagram.append({'T' : temp, 
