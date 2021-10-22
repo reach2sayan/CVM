@@ -13,37 +13,42 @@ import warnings
 import random
 from logger import Logger
 import sys
+import pprint
+import os
 
 
 if __name__ == '__main__':
 
+    cwd = os.getcwd()
+    datadir = f'{cwd}/data'
+    outdir = f'{cwd}/results'
     np.set_printoptions(suppress=True,precision=2)
     random.seed(42)
     np.random.seed(seed=42)    
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--eci',
-                        default='eci.out', 
+                        default=f'{datadir}/eci.out', 
                         help="file containing ECI's (default: %(default)s)",
                        )
     parser.add_argument('--vmat', 
-                        default='vmat.out',
+                        default=f'{datadir}/vmat.out',
                         help="file containing the vmatrix (default: %(default)s)",
                        )
     parser.add_argument('--clusters',
-                        default='clusters.out',
+                        default=f'{datadir}/clusters.out',
                         help="file contain the maximal cluster description (default: %(default)s)",
                        )
     parser.add_argument('--kb',
-                        default='kb.out',
+                        default=f'{datadir}/kb.out',
                         help="file containing the kikuchi-barker coefficients (default: %(default)s)",
                        )
     parser.add_argument('--configcoef',
-                        default='configcoef.out',
+                        default=f'{datadir}/configcoef.out',
                         help="file containing coefficient for each subcluster (default: %(default)s)",
                        )
     parser.add_argument('--configs','--config',
-                        default='config.out',
+                        default=f'{datadir}/config.out',
                         help="file containing subcluster descriptions (default: %(default)s)",
                        )
     parser.add_argument('--Tmin',
@@ -77,7 +82,7 @@ if __name__ == '__main__':
                         help="Number of data points between Xmin and Xmax (default: %(default)s)",
                        )
     parser.add_argument('--out',
-                        default='phasediagram_latest.csv',
+                        default=f'{outdir}/phasediagram_latest.csv',
                         help="Name of the dataframe containing the result of the optimisation"
                        )
     parser.add_argument('--verbose', '-v', action='count', default=0,
@@ -88,10 +93,15 @@ if __name__ == '__main__':
                         type=int,
                         help="Indicate maximum iterations for the local optimiser (default: %(default)s)",
                        )
-    parser.add_argument('--tolerance',
+    parser.add_argument('--xtol',
                         default=1e-12,
                         type=float,
                         help="Indicate the acceptable difference between two iterations (default: %(default)s)",
+                       )
+    parser.add_argument('--gtol',
+                        default=1e-12,
+                        type=float,
+                        help="Indicate the acceptable violation of constraints (default: %(default)s)",
                        )
     parser.add_argument('--global_trials',
                         default=100,
@@ -113,13 +123,13 @@ if __name__ == '__main__':
                         default=False,
                         help="Enables to show warning",
                        )
-    parser.add_argument('--log',
+    parser.add_argument('--toscreen',
                         action='store_true',
                         default=False,
-                        help="Enable logging",
+                        help="Enable logging to screen",
                        )
     parser.add_argument('--logfile',
-                        default='log.out',
+                        default=f'{cwd}/log.out',
                         help="Filename for the log file (default: %(default)s)"
                        )
 
@@ -128,7 +138,7 @@ if __name__ == '__main__':
     if not args.show_warning:
         warnings.filterwarnings("ignore")
 
-    sys.stdout = Logger(sys.stdout, args.logfile)
+    sys.stdout = Logger(sys.stdout, args.logfile,args.toscreen)
     clusters = dl.read_clusters(args.clusters)
     kb = dl.read_kbcoeffs(args.kb)
     configcoef = dl.read_configcoef(args.configcoef)
@@ -158,9 +168,22 @@ if __name__ == '__main__':
 
     options = {'verbose' : args.verbose,
                'maxiter' : args.maxiter,
-               'xtol'    : args.tolerance,
+               'xtol'    : args.xtol,
+               'gtol'    : args.gtol,
                'initial_constr_penalty' : 10
               }
+
+    print("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
+    print("Parameters: ")
+    print("ECI:")
+    pprint.pp(eci)
+    print("Vmatrix")
+    pprint.pp(vmat)
+    print("Clusters:")
+    pprint.pp(clusters)
+    print("Cluster Coefficients:")
+    pprint.pp(configcoef)
+    print("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n\n")
 
     for temp in np.linspace(MIN_TEMP, MAX_TEMP, num=steps):
         for FIXED_CORR_1 in np.linspace(MIN_CORR, MAX_CORR, num=corr_steps):
@@ -196,11 +219,11 @@ if __name__ == '__main__':
                 print(np.matmul(vmat[cluster_idx],result.x))
             try:
                 for cluster_idx in clusters.keys():
-                    assert np.isclose(np.inner(configcoef[cluster_idx], np.matmul(vmat[cluster_idx], temp_results.x)), 1.0)
+                    assert np.isclose(np.inner(configcoef[cluster_idx], np.matmul(vmat[cluster_idx], results.x)), 1.0)
             except AssertionError:
                 print("Failed to find solution...Current Rho")
                 for cluster_idx, _ in clusters.items():
-                    print(np.matmul(vmat[cluster_idx],temp_results.x))
+                    print(np.matmul(vmat[cluster_idx],results.x))
                     continue
 
             results_phasediagram = results_phasediagram.append({'T' : temp, 

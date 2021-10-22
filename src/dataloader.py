@@ -107,7 +107,7 @@ def read_configs(config_fname):
     # Read config.out
     configs = {}
 
-    fconfig = open('config.out','r')
+    fconfig = open(config_fname,'r')
     _ = next(fconfig) #Ignore first line
 
     temp_config = fconfig.read()#.split('\n\n')
