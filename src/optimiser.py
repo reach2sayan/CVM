@@ -2,6 +2,7 @@ from scipy.optimize import minimize, basinhopping
 from scipy.optimize import SR1, BFGS
 import numpy as np
 import random
+import pprint
 
 def fit(F,
         vmat, kb, 
@@ -50,9 +51,15 @@ def fit(F,
             MIN_RES_VAL = temp_results.fun
             if NN:
                 print(f"Found new minimum for Corr1:{FIXED_CORR_1:.4f}, Corr2:{FIXED_CORR_2:.4f} fun: {MIN_RES_VAL:.15f}")
-                print(f'Current minimum correlations: {temp_results.x}')
             else:
                 print(f"Found new minimum for x:{FIXED_CORR_1:.4f}, T:{temp} fun: {MIN_RES_VAL}")
-                print(f'Current minimum correlations: {temp_results.x}')
+
+            print(f'Current minimum correlations: {temp_results.x}')
+            print("Rhos:")
+            for val in temp_results.constr[:num_clusters]:
+                print(np.array2string(val))
+            print(f"Gradient: {np.array2string(temp_results.grad)}")
+            print(f"Stop Status: {temp_results.status} | {temp_results.message}")
+            print('\n====================================\n')
 
     return MIN_RES

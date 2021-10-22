@@ -9,6 +9,8 @@ import optimiser as opt
 import pandas as pd
 from constraints import Constraints
 from bounds import CorrBounds
+from logger import Logger
+import sys
 import warnings
 import random
 
@@ -149,6 +151,7 @@ if __name__ == '__main__':
     if not args.show_warning:
         warnings.filterwarnings("ignore")
 
+    sys.stdout = Logger(sys.stdout,args.logfile)
     clusters = dl.read_clusters(args.clusters)
     kb = dl.read_kbcoeffs(args.kb)
     configcoef = dl.read_configcoef(args.configcoef)
@@ -193,7 +196,11 @@ if __name__ == '__main__':
 
     for temp in np.linspace(MIN_TEMP, MAX_TEMP, num=steps):
         for FIXED_CORR_1, FIXED_CORR_2 in singlet_doublet_pairs:
-            print(f"T: {temp} CORR_1: {FIXED_CORR_1}, CORR_2: {FIXED_CORR_2}")
+            
+            print('-------------------------------------------------------------------')
+            print(f" ## T: {temp} -- CORR_1: {FIXED_CORR_1}, -- CORR_2: {FIXED_CORR_2}")
+            print('-------------------------------------------------------------------')
+
             constraints_corrscan = constraints.get_constraints_corrscan(FIXED_CORR_1, FIXED_CORR_2)
             bounds_corrscan = bounds.get_corrscan_bounds(FIXED_CORR_1,FIXED_CORR_2)
 
@@ -216,7 +223,7 @@ if __name__ == '__main__':
                              NN=True
                             )
 
-            print(f"Corrs: {result.x} ENERGY: {result.fun}")
+            print(f"## Corrs: {result.x} -- ENERGY: {result.fun}")
             for cluster_idx, _ in clusters.items():
                 print(np.matmul(vmat[cluster_idx],result.x))
 
