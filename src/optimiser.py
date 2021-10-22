@@ -1,7 +1,7 @@
 from scipy.optimize import minimize, basinhopping
 from scipy.optimize import SR1, BFGS
 import numpy as np
-from tqdm import tqdm
+import random
 
 def fit(F,
         vmat, kb, 
@@ -14,16 +14,25 @@ def fit(F,
         hess,
         NUM_TRIALS,
         FIXED_CORR_1,
+        FIXED_CORR_2,
         bounds,
         constraints,
-        num_clusters
+        num_clusters,
+        NN
        ):
+
+    random.seed(42)
 
     MIN_RES = None 
     MIN_RES_VAL = 1e5 #random large number
-    for _ in tqdm(range(NUM_TRIALS)):
+    for _ in range(NUM_TRIALS):
 
-        corrs0 = np.array([1, FIXED_CORR_1, *np.random.uniform(-1, 1, num_clusters-2)])
+        print(_,end='\r')
+
+        if NN:
+            corrs0 = np.array([1, FIXED_CORR_1, FIXED_CORR_2, *np.random.uniform(-1, 1, len(clusters)-3)])
+        else:
+            corrs0 = np.array([1, FIXED_CORR_1, *np.random.uniform(-1, 1, len(clusters)-2)])
 
         temp_results = minimize(F,
                                 corrs0,
@@ -39,13 +48,11 @@ def fit(F,
         if temp_results.fun < MIN_RES_VAL:
             MIN_RES = temp_results
             MIN_RES_VAL = temp_results.fun
-            tqdm.write(f"Found new minimum for x:{FIXED_CORR_1}, T:{temp} fun: {MIN_RES_VAL}")
-            tqdm.write(f'Current minimum correlations: {temp_results.x}')
+            if NN:
+                print(f"Found new minimum for Corr1:{FIXED_CORR_1:.4f}, Corr2:{FIXED_CORR_2:.4f} fun: {MIN_RES_VAL:.15f}")
+                print(f'Current minimum correlations: {temp_results.x}')
+            else:
+                print(f"Found new minimum for x:{FIXED_CORR_1:.4f}, T:{temp} fun: {MIN_RES_VAL}")
+                print(f'Current minimum correlations: {temp_results.x}')
 
-        for cluster_idx in clusters.keys():
-            assert np.isclose(np.inner(configcoef[cluster_idx],
-                                       np.matmul(vmat[cluster_idx],
-                                                 temp_results.x))
-                              ,1.0
-                             )
     return MIN_RES

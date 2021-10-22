@@ -12,11 +12,45 @@ from bounds import CorrBounds
 import warnings
 import random
 
+def get_uniform_triangular_points(xvalues, yvalues, x1=0, y1=0, x2=-1, y2=1, x3=1, y3=1, num = 10):
+
+    def isInside(x, y, x1=0, y1=0, x2=-1, y2=1, x3=1, y3=1,):
+
+        def area(x1, y1, x2, y2, x3, y3):
+            return abs((x1*(y2 - y3) + x2*(y3 - y1) + x3*(y1 - y2))/2.0)
+
+        # Calculate area of triangle ABC
+        A = area(x1, y1, x2, y2, x3, y3)
+        # Calculate area of triangle PBC
+        A1 = area(x, y, x2, y2, x3, y3)
+        # Calculate area of triangle PAC
+        A2 = area(x1, y1, x, y, x3, y3)
+        # Calculate area of triangle PAB
+        A3 = area(x1, y1, x2, y2, x, y)
+        # Check if sum of A1, A2 and A3
+        # is same as A
+        if(A == A1 + A2 + A3):
+            return True
+        else:
+            return False
+
+
+    points = []
+    #xx, yy = np.meshgrid(xvalues, yvalues)
+    grid = np.meshgrid(xvalues, yvalues)
+    grid = np.vstack(list(map(np.ravel, grid))).T
+
+    for x, y in grid:
+        if isInside(x,y,x1=x1,y1=y1,x2=x2,y2=y2,x3=x3,y3=y3):
+            points.append([x,y])
+
+    return np.array(points)
+
 if __name__ == '__main__':
 
     np.set_printoptions(suppress=True,precision=2)
-    random.seed(42)
     np.random.seed(seed=42)    
+    random.seed(42)
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--eci',
@@ -58,23 +92,13 @@ if __name__ == '__main__':
                         default=11,
                         help="Number of data points between Tmin and Tmax (default: %(default)s)",
                        )
-    parser.add_argument('--Xmin',
-                        type=float,
-                        default=None,
-                        help="minimum 1-point correlations (default: -1)",
-                       )
-    parser.add_argument('--Xmax',
-                        type=float,
-                        default=None,
-                        help="maximum 1-point correlations (default: +1)",
-                       )
     parser.add_argument('--ncorr',
                         type=int,
-                        default=9,
-                        help="Number of data points between Xmin and Xmax (default: %(default)s)",
+                        default=8,
+                        help="Number of data points 1-point correlations  (default: %(default)s)",
                        )
     parser.add_argument('--out',
-                        default='phasediagram_latest.csv',
+                        default='corrscan_latest.csv',
                         help="Name of the dataframe containing the result of the optimisation"
                        )
     parser.add_argument('--verbose', '-v', action='count', default=0,
@@ -134,20 +158,12 @@ if __name__ == '__main__':
     outfile = args.out
     MIN_TEMP = args.Tmin
     MAX_TEMP = args.Tmax
-    if args.Xmin is None:
-        MIN_CORR = -1+np.finfo(float).eps
-    else:
-        MIN_CORR = args.Xmin
-    if args.Xmax is None:
-        MAX_CORR = 1-np.finfo(float).eps
-    else:
-        MAX_CORR = args.Xmax
     steps = args.nTemp
-    corr_steps = args.ncorr
     NUM_TRIALS = args.global_trials
     num_clusters = len(clusters)   
+    ncorr = args.ncorr
 
-    results_phasediagram = pd.DataFrame(columns = ['T', '1-point_corr', 'F','corrs'])
+    results_corrscan = pd.DataFrame(columns = ['T', '1-point_corr', '2-point_corr', 'F','corrs'])
 
     constraints = Constraints(clusters, configcoef, vmat)
     bounds = CorrBounds(num_clusters)
@@ -158,12 +174,28 @@ if __name__ == '__main__':
                'initial_constr_penalty' : 10
               }
 
-    for temp in np.linspace(MIN_TEMP, MAX_TEMP, num=steps):
-        for FIXED_CORR_1 in np.linspace(MIN_CORR, MAX_CORR, num=corr_steps):
-            print(f"T: {temp} CORR_1: {FIXED_CORR_1}")
+    xvalues = np.linspace(-1+np.finfo(float).eps,1-np.finfo(float).eps,ncorr)
+    yvalues = np.linspace(-1+np.finfo(float).eps,1-np.finfo(float).eps,ncorr)
+    singlet_doublet_pairs = get_uniform_triangular_points(xvalues, yvalues, 
+                                                          x1=0, y1=-1, 
+                                                          x2=-1, y2=1,
+                                                          x3=1, y3=1,
+                                                          num=ncorr
+                                                         )
+    singlet_doublet_pairs = np.append(singlet_doublet_pairs,
+                                      [[0,-1+np.finfo(float).eps]],
+                                      axis=0)
 
-            constraints_pd = constraints.get_constraints_phasediagram(FIXED_CORR_1)
-            bounds_pd = bounds.get_pd_bounds(FIXED_CORR_1)
+    import matplotlib.pyplot as plt
+    plt.style.use('default')
+    plt.scatter(singlet_doublet_pairs[:, 0], singlet_doublet_pairs[:, 1], s=5)
+    plt.savefig('NN-grid.png',dpi=300)
+
+    for temp in np.linspace(MIN_TEMP, MAX_TEMP, num=steps):
+        for FIXED_CORR_1, FIXED_CORR_2 in singlet_doublet_pairs:
+            print(f"T: {temp} CORR_1: {FIXED_CORR_1}, CORR_2: {FIXED_CORR_2}")
+            constraints_corrscan = constraints.get_constraints_corrscan(FIXED_CORR_1, FIXED_CORR_2)
+            bounds_corrscan = bounds.get_corrscan_bounds(FIXED_CORR_1,FIXED_CORR_2)
 
             result = opt.fit(F=F,
                              vmat=vmat, kb=kb, 
@@ -177,71 +209,33 @@ if __name__ == '__main__':
                              hess=F_hessian,
                              NUM_TRIALS=NUM_TRIALS,
                              FIXED_CORR_1=FIXED_CORR_1,
-                             FIXED_CORR_2=None,
-                             bounds=bounds_pd,
-                             constraints=constraints_pd,
+                             FIXED_CORR_2=FIXED_CORR_2,
+                             bounds=bounds_corrscan,
+                             constraints=constraints_corrscan,
                              num_clusters=num_clusters,
-                             NN=False
+                             NN=True
                             )
 
             print(f"Corrs: {result.x} ENERGY: {result.fun}")
             for cluster_idx, _ in clusters.items():
                 print(np.matmul(vmat[cluster_idx],result.x))
-            try:
-                for cluster_idx in clusters.keys():
-                    assert np.isclose(np.inner(configcoef[cluster_idx], np.matmul(vmat[cluster_idx], temp_results.x)), 1.0)
-            except AssertionError:
-                print("Failed to find solution...Current Rho")
-                for cluster_idx, _ in clusters.items():
-                    print(np.matmul(vmat[cluster_idx],temp_results.x))
-                    continue
 
-            results_phasediagram = results_phasediagram.append({'T' : temp, 
-                                                               '1-point_corr' : FIXED_CORR_1, 
-                                                               'F' : result.fun, 
-                                                               'corrs': result.x,
-                                                               }, 
-                                                               ignore_index = True
-                                                              )
+            results_corrscan = results_corrscan.append({'T' : temp, 
+                                                        '1-point_corr' : FIXED_CORR_1, 
+                                                        '2-point_corr': FIXED_CORR_2,
+                                                        'F' : result.fun, 
+                                                        'corrs': result.x,
+                                                       }, 
+                                                       ignore_index = True
+                                                      )
 
     corrcols = [f'corr {i}' for i in range(num_clusters)]
-    results_phasediagram[corrcols] = pd.DataFrame(results_phasediagram.corrs.tolist(), 
-                                                  index = results_phasediagram.index,
-                                                 )
-    results_phasediagram.drop(['corrs'],axis=1,inplace=True)
+    results_corrscan[corrcols] = pd.DataFrame(results_corrscan.corrs.tolist(), 
+                                              index = results_corrscan.index,
+                                             )
+    results_corrscan.drop(['corrs'],axis=1,inplace=True)
 
-    results_phasediagram.to_csv(outfile,index=False)
+    results_corrscan.to_csv(outfile,index=False)
     
     #TODO: Add handler for plotting phase diagram
     #plot_tool.plot_phasediagram(results_phasediagram)
-
-
-
-
-
-
-#corrs1 = np.array([1., 1., 1., 1., 1., 1.]) #Pure B
-#corrs0 = np.array([1., -1., 1., 1., -1., 1.]) #Pure A
-#corrssqs = np.array([1.    , 0.0   , 0.25,0.25  , 0.125 , 0.0625]) # AB - sqs
-#corrsrand = np.array([1.   , *np.random.uniform(-1, 1, 5)]) 
-#T = 1/kB
-#
-#f0 = F(corrs0, vmat, kb, clusters, configs, configcoef,T,eci)
-#f1 = F(corrs1, vmat, kb, clusters, configs, configcoef,T,eci)
-#fsqs = F(corrssqs, vmat, kb, clusters, configs, configcoef,T,eci)
-#frand = F(corrsrand, vmat, kb, clusters, configs, configcoef,T,eci)
-#print(f"Corrs 0: {f0:.2f} -- Corrs 1: {f1:.2f} -- Corrs Rand: {frand:.2f} -- Corrs SQS: {fsqs:.2f}")
-#
-#f_jaco0 = F_jacobian(corrs0, vmat, kb, clusters, configs, configcoef,T,eci)
-#f_jaco1 = F_jacobian(corrs1, vmat, kb, clusters, configs, configcoef,T,eci)
-#f_jacosqs = F_jacobian(corrssqs, vmat, kb, clusters, configs, configcoef,T,eci)
-#f_jacorand = F_jacobian(corrsrand, vmat, kb, clusters, configs, configcoef,T,eci)
-#print(f"Corrs 0: {f_jaco0} \nCorrs 1: {f_jaco1} \nCorrs Rand {f_jacorand} \nCorrs SQS {f_jacosqs}")
-#
-#f_hess0 = F_hessian(corrs0, vmat, kb, clusters, configs, configcoef,T,eci)
-#f_hess1 = F_hessian(corrs1, vmat, kb, clusters, configs, configcoef,T,eci)
-#f_hessrand = F_hessian(corrsrand, vmat, kb, clusters, configs, configcoef,T,eci)
-#f_hesssqs = F_hessian(corrssqs, vmat, kb, clusters, configs, configcoef,T,eci)
-#print(f"Corrs 0:\n {f_hess0} \n Corrs 1:\n {f_hess1}\n Corrs Rand:\n {f_hessrand} \n Corrs SQS:\n {f_hesssqs}")
-
-

@@ -49,7 +49,7 @@ class Constraints:
         corrs[2] = FIXED_CORR_2
         """
         return corrs[2] - FIXED_CORR_2 
-
+ 
     def get_constraints_phasediagram(self,FIXED_CORR_1):
 
         linear_constraints = self.set_linear_constraints()
@@ -63,6 +63,26 @@ class Constraints:
                              'type':'eq'
                             }
                            ]
+        return self.constraints
+
+    def get_constraints_corrscan(self,FIXED_CORR_1,FIXED_CORR_2):
+
+        linear_constraints = self.set_linear_constraints()
+
+        self.constraints = [*linear_constraints,
+                            {'fun': self.constraint_singlet,
+                             'type':'eq',
+                             'args':[FIXED_CORR_1]
+                            },
+                            {'fun': self.constraint_NN,
+                             'type':'eq',
+                             'args':[FIXED_CORR_2]
+                            },
+                            {'fun': self.constraint_zero,
+                             'type':'eq'
+                            }
+                           ]
+        return self.constraints
 #    class MyBounds:
 #        """
 #        Class to constrain the trial correlations of Basin Hopping

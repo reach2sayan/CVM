@@ -15,3 +15,10 @@ class CorrBounds:
                               [1, FIXED_CORR_1, *[1]*(self.num_clusters-2)],
                              )
         return bounds_corrs
+
+    def get_corrscan_bounds(self, FIXED_CORR_1, FIXED_CORR_2):
+
+        bounds_corrs = Bounds([1, FIXED_CORR_1, FIXED_CORR_2, *[-1]*(self.num_clusters-3)],
+                              [1, FIXED_CORR_1, FIXED_CORR_2, *[1]*(self.num_clusters-3)],
+                             )
+        return bounds_corrs
