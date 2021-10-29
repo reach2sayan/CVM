@@ -1,20 +1,18 @@
 #!/usr/bin/env python3
 
 import argparse
-import dataloader as dl
 from energyfunctions import F, F_jacobian, F_hessian
+from clusterdata import ClusterInfo
 import numpy as np
-from ase.units import kB
 import optimiser as opt
-import pandas as pd
 from constraints import Constraints
 from bounds import CorrBounds
 import warnings
 import random
 from logger import Logger
 import sys
-import pprint
 import os
+import json
 
 
 if __name__ == '__main__':
@@ -139,12 +137,15 @@ if __name__ == '__main__':
         warnings.filterwarnings("ignore")
 
     sys.stdout = Logger(sys.stdout, args.logfile,args.toscreen)
-    clusters = dl.read_clusters(args.clusters)
-    kb = dl.read_kbcoeffs(args.kb)
-    configcoef = dl.read_configcoef(args.configcoef)
-    configs = dl.read_configs(args.configs)
-    vmat = dl.read_vmatrix(args.vmat)
-    eci = dl.read_eci(args.eci)
+
+    clusters = ClusterInfo(args.clusters,
+                           args.kb,
+                           args.configcoef,
+                           args.configs,
+                           args.vmat,
+                           args.eci,
+                          )
+
     outfile = args.out
     MIN_TEMP = args.Tmin
     MAX_TEMP = args.Tmax
@@ -159,11 +160,14 @@ if __name__ == '__main__':
     steps = args.nTemp
     corr_steps = args.ncorr
     NUM_TRIALS = args.global_trials
-    num_clusters = len(clusters)   
+    num_clusters = len(clusters.clusters)   
 
-    results_phasediagram = pd.DataFrame(columns = ['T', '1-point_corr', 'F','corrs'])
+    results_phasediagram = []
 
-    constraints = Constraints(clusters, configcoef, vmat)
+    constraints = Constraints(clusters.clusters, 
+                              clusters.configcoef, 
+                              clusters.vmat)
+
     bounds = CorrBounds(num_clusters)
 
     options = {'verbose' : args.verbose,
@@ -174,15 +178,8 @@ if __name__ == '__main__':
               }
 
     print("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
-    print("Parameters: ")
-    print("ECI:")
-    pprint.pp(eci)
-    print("Vmatrix")
-    pprint.pp(vmat)
-    print("Clusters:")
-    pprint.pp(clusters)
-    print("Cluster Coefficients:")
-    pprint.pp(configcoef)
+    print("Cluster Parameters: ")
+    print(clusters)
     print("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n\n")
 
     for temp in np.linspace(MIN_TEMP, MAX_TEMP, num=steps):
@@ -196,12 +193,12 @@ if __name__ == '__main__':
             bounds_pd = bounds.get_pd_bounds(FIXED_CORR_1)
 
             result = opt.fit(F=F,
-                             vmat=vmat, kb=kb, 
-                             clusters=clusters, 
-                             configs=configs, 
-                             configcoef=configcoef,
+                             vmat=clusters.vmat, kb=clusters.kb, 
+                             clusters=clusters.clusters, 
+                             configs=clusters.configs, 
+                             configcoef=clusters.configcoef,
+                             eci=clusters.eci, 
                              temp=temp, 
-                             eci=eci, 
                              options=options,
                              jac=F_jacobian,
                              hess=F_hessian,
@@ -215,63 +212,21 @@ if __name__ == '__main__':
                             )
 
             print(f"## Corrs: {result.x} -- ENERGY: {result.fun}")
-            for cluster_idx, _ in clusters.items():
-                print(np.matmul(vmat[cluster_idx],result.x))
-            try:
-                for cluster_idx in clusters.keys():
-                    assert np.isclose(np.inner(configcoef[cluster_idx], np.matmul(vmat[cluster_idx], results.x)), 1.0)
-            except AssertionError:
-                print("Failed to find solution...Current Rho")
-                for cluster_idx, _ in clusters.items():
-                    print(np.matmul(vmat[cluster_idx],results.x))
-                    continue
+            print(f"## Rho:")
+            print(f"{clusters.rho(result.x)}")
 
-            results_phasediagram = results_phasediagram.append({'T' : temp, 
-                                                               '1-point_corr' : FIXED_CORR_1, 
-                                                               'F' : result.fun, 
-                                                               'corrs': result.x,
-                                                               }, 
-                                                               ignore_index = True
-                                                              )
+            clusters.check_result_validity(result.x)
+
+            results_phasediagram.append({'T' : temp, 
+                                         '1-point_corr' : FIXED_CORR_1, 
+                                         'F' : result.fun, 
+                                         'corrs': list(result.x),
+                                        }, 
+                                       )
 
     corrcols = [f'corr {i}' for i in range(num_clusters)]
-    results_phasediagram[corrcols] = pd.DataFrame(results_phasediagram.corrs.tolist(), 
-                                                  index = results_phasediagram.index,
-                                                 )
-    results_phasediagram.drop(['corrs'],axis=1,inplace=True)
-
-    results_phasediagram.to_csv(outfile,index=False)
-    
-    #TODO: Add handler for plotting phase diagram
-    #plot_tool.plot_phasediagram(results_phasediagram)
-
-
-
-
-
-
-#corrs1 = np.array([1., 1., 1., 1., 1., 1.]) #Pure B
-#corrs0 = np.array([1., -1., 1., 1., -1., 1.]) #Pure A
-#corrssqs = np.array([1.    , 0.0   , 0.25,0.25  , 0.125 , 0.0625]) # AB - sqs
-#corrsrand = np.array([1.   , *np.random.uniform(-1, 1, 5)]) 
-#T = 1/kB
-#
-#f0 = F(corrs0, vmat, kb, clusters, configs, configcoef,T,eci)
-#f1 = F(corrs1, vmat, kb, clusters, configs, configcoef,T,eci)
-#fsqs = F(corrssqs, vmat, kb, clusters, configs, configcoef,T,eci)
-#frand = F(corrsrand, vmat, kb, clusters, configs, configcoef,T,eci)
-#print(f"Corrs 0: {f0:.2f} -- Corrs 1: {f1:.2f} -- Corrs Rand: {frand:.2f} -- Corrs SQS: {fsqs:.2f}")
-#
-#f_jaco0 = F_jacobian(corrs0, vmat, kb, clusters, configs, configcoef,T,eci)
-#f_jaco1 = F_jacobian(corrs1, vmat, kb, clusters, configs, configcoef,T,eci)
-#f_jacosqs = F_jacobian(corrssqs, vmat, kb, clusters, configs, configcoef,T,eci)
-#f_jacorand = F_jacobian(corrsrand, vmat, kb, clusters, configs, configcoef,T,eci)
-#print(f"Corrs 0: {f_jaco0} \nCorrs 1: {f_jaco1} \nCorrs Rand {f_jacorand} \nCorrs SQS {f_jacosqs}")
-#
-#f_hess0 = F_hessian(corrs0, vmat, kb, clusters, configs, configcoef,T,eci)
-#f_hess1 = F_hessian(corrs1, vmat, kb, clusters, configs, configcoef,T,eci)
-#f_hessrand = F_hessian(corrsrand, vmat, kb, clusters, configs, configcoef,T,eci)
-#f_hesssqs = F_hessian(corrssqs, vmat, kb, clusters, configs, configcoef,T,eci)
-#print(f"Corrs 0:\n {f_hess0} \n Corrs 1:\n {f_hess1}\n Corrs Rand:\n {f_hessrand} \n Corrs SQS:\n {f_hesssqs}")
-
-
+    for item in results_phasediagram:
+        for idx, corrnum in enumerate(corrcols):
+            item[f'{corrnum}'] = item['corrs'][idx]
+    with open(outfile,'w') as fout:
+        json.dump(results_phasediagram, fout)

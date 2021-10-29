@@ -1,7 +1,8 @@
 import numpy as np
 import math
-from ase.units import kB
 
+
+kB = 8.617330337217213e-05
 def F(corrs, vmat, kb, clusters, configs, configcoef,T,eci):
     """
     Input: 

@@ -79,4 +79,7 @@ dmypy.json
 *.out
 *.log
 *.ipynb
+*.png
+*.gif
+*.json
 trial.csv
