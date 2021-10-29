@@ -23,6 +23,7 @@ if __name__ == '__main__':
     np.set_printoptions(suppress=True,precision=2)
     random.seed(42)
     np.random.seed(seed=42)    
+    pp = pprint.PrettyPrinter(indent=4)
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--eci',
@@ -119,12 +120,12 @@ if __name__ == '__main__':
     parser.add_argument('--show_warning',
                         action='store_true',
                         default=False,
-                        help="Enables to show warning",
+                        help="Enables to show warning (default: %(default)s)",
                        )
     parser.add_argument('--toscreen',
                         action='store_true',
                         default=False,
-                        help="Enable logging to screen",
+                        help="Enable logging to screen (default: %(default)s)",
                        )
     parser.add_argument('--logfile',
                         default=f'{cwd}/log.out',
@@ -177,6 +178,7 @@ if __name__ == '__main__':
                'initial_constr_penalty' : 10
               }
 
+    
     print("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
     print("Cluster Parameters: ")
     print(clusters)
