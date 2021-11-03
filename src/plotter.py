@@ -3,9 +3,11 @@ import matplotlib.tri as tri
 import pandas as pd
 import numpy as np
 
-def plot_phasediagram(results_file,eci,savename='pd.png',style='ggplot'):
+RESULTDIR = '/home/sayan/Research/CVM/results'
 
-    results = pd.read_csv(results_file)
+def plot_phasediagram(results_file,savename='pd.png',style='ggplot'):
+
+    results = pd.read_json(f'{RESULTDIR}/{results_file}')
 
     plt.style.use(style)
     for T in results['T'].unique():
@@ -15,7 +17,7 @@ def plot_phasediagram(results_file,eci,savename='pd.png',style='ggplot'):
                 )
 
     plt.xlim(-1,1)
-    plt.title(f"ECI : {eci[2]} :: {eci[3]}")
+#    plt.title(f"ECI : {eci[2]} :: {eci[3]}")
     plt.legend()
     plt.ylabel('Temperature -->')
     plt.xlabel('1-point Correlation -->')
@@ -25,7 +27,7 @@ def plot_phasediagram(results_file,eci,savename='pd.png',style='ggplot'):
 
 def plot_NN(results_file,eci,savename='2NN.png',style='ggplot'):
 
-    results = pd.read_csv(results_file)
+    results = pd.read_json(f'{RESULTDIR}/{results_file}')
 
     plt.style.use(style)
     plt.plot(results[results['1-point_corr'] == 0.0]['T'],
@@ -41,7 +43,7 @@ def plot_NN(results_file,eci,savename='2NN.png',style='ggplot'):
 
 def plot_NN_triangle(results_file,eci,single_temp,single=True,gif=False,savename='corr_triangle.png',style='ggplot'):
 
-    results = pd.read_csv(results_file)
+    results = pd.read_json(f'{RESULTDIR}/{results_file}')
     temperatures = results['T'].unique()
 
     plt.style.use(style)

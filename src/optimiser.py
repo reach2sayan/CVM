@@ -1,8 +1,8 @@
 from scipy.optimize import minimize, basinhopping
 from scipy.optimize import SR1, BFGS
+from valid_corr_generator import get_valid_corrs
 import numpy as np
 import random
-import pprint
 
 def fit(F,
         vmat, kb, 
@@ -31,9 +31,9 @@ def fit(F,
         print(_,end='\r')
 
         if NN:
-            corrs0 = np.array([1, FIXED_CORR_1, FIXED_CORR_2, *np.random.uniform(-1, 1, len(clusters)-3)])
+            corrs0 = get_valid_corrs(FIXED_CORR_1,FIXED_CORR_2,vmat,clusters,num_clusters)
         else:
-            corrs0 = np.array([1, FIXED_CORR_1, *np.random.uniform(-1, 1, len(clusters)-2)])
+            corrs0 = get_valid_corrs(FIXED_CORR_1,None,vmat,clusters,num_clusters)
 
         temp_results = minimize(F,
                                 corrs0,
