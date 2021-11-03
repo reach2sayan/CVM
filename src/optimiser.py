@@ -50,6 +50,7 @@ def fit(F,
             MIN_RES = temp_results
             MIN_RES_VAL = temp_results.fun
             if NN:
+                print('\n')
                 print(f"Found new minimum for Corr1:{FIXED_CORR_1:.4f}, Corr2:{FIXED_CORR_2:.4f} fun: {MIN_RES_VAL:.15f}")
             else:
                 print(f"Found new minimum for x:{FIXED_CORR_1:.4f}, T:{temp} fun: {MIN_RES_VAL}")
