@@ -8,15 +8,17 @@ def get_valid_corrs(FIXED_CORR1,FIXED_CORR2,vmat,clusters,num_clusters):
         if corr1 <=0 :
             if FIXED_CORR2 is None:
                 corr2 = np.random.uniform(-2*corr1 - 1, 1)
+                corr3 = np.random.uniform(-2*corr1 - 1, 1)
             else:
                 corr2 = FIXED_CORR2
-            corr3 = np.random.uniform(-2*corr1 - 1, 1)
+                corr3 = FIXED_CORR2
         else:
             if FIXED_CORR2 is None:
                 corr2 = corr2 = np.random.uniform(2*corr1 - 1, 1)
+                corr3 = np.random.uniform(2*corr1 - 1, 1)
             else:
                 corr2 = FIXED_CORR2
-            corr3 = np.random.uniform(2*corr1 - 1, 1)
+                corr3 = FIXED_CORR2
 
         corr4 = np.random.uniform(corr1+corr2-1,corr1-corr2+1)
         corr5 = np.random.uniform(2*corr3-1,1)

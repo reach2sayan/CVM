@@ -258,10 +258,10 @@ if __name__ == '__main__':
                                     }, 
                                    )
 
-    corrcols = [f'corr {i}' for i in range(num_clusters)]
+            corrcols = [f'corr {i}' for i in range(num_clusters)]
 
-    for item in results_corrscan:
-        for idx, corrnum in enumerate(corrcols):
-            item[f'{corrnum}'] = item['corrs'][idx]
-    with open(outfile,'w') as fout:
-        json.dump(results_corrscan, fout)
+            for item in results_corrscan:
+                for idx, corrnum in enumerate(corrcols):
+                    item[f'{corrnum}'] = item['corrs'][idx]
+            with open(outfile,'w') as fout:
+                json.dump(results_corrscan, fout)

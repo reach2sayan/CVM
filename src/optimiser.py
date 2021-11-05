@@ -31,7 +31,8 @@ def fit(F,
         print(_,end='\r')
 
         if NN:
-            corrs0 = get_valid_corrs(FIXED_CORR_1,FIXED_CORR_2,vmat,clusters,num_clusters)
+            corrs0 = np.array([1,FIXED_CORR_1,FIXED_CORR_2, *np.random.uniform(-1,1,num_clusters-3)])
+#            corrs0 = get_valid_corrs(FIXED_CORR_1,FIXED_CORR_2,vmat,clusters,num_clusters)
         else:
             corrs0 = get_valid_corrs(FIXED_CORR_1,None,vmat,clusters,num_clusters)
 
