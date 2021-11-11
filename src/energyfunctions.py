@@ -2,8 +2,8 @@ import numpy as np
 import math
 
 
-#kB = 8.617330337217213e-05
-kB = 1.0
+kB = 8.617330337217213e-05
+#kB=1
 def F(corrs, vmat, kb, clusters, configs, configcoef,T,eci):
     """
     Input: 
