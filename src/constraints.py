@@ -83,6 +83,19 @@ class Constraints:
                             }
                            ]
         return self.constraints
+
+    def get_constraints_muscan(self,):
+
+        linear_constraints = self.set_linear_constraints()
+
+        self.constraints = [*linear_constraints,
+                            {'fun': self.constraint_zero,
+                             'type':'eq'
+                            }
+                           ]
+
+        return self.constraints
+
 #    class MyBounds:
 #        """
 #        Class to constrain the trial correlations of Basin Hopping

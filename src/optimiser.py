@@ -65,3 +65,67 @@ def fit(F,
             print('\n====================================\n')
 
     return MIN_RES
+
+def mufit(F,
+          vmat, kb, 
+          clusters, 
+          configs, configcoef,
+          temp, 
+          eci, 
+          options,
+          jac,
+          hess,
+          NUM_TRIALS,
+          bounds,
+          constraints,
+          num_clusters,
+          mu,
+         ):
+
+    random.seed(42)
+
+    MIN_RES = None 
+    MIN_RES_VAL = 1e5 #random large number
+    for _ in range(NUM_TRIALS):
+
+        print(_,end='\r')
+
+        corrs0 = np.array([1,*np.random.uniform(-1,1,num_clusters-1)])
+        #for _ in iter(int,1):
+        #    corrs0 = np.array([1, *np.random.uniform(-1, 1, num_clusters-1)])
+        #    validcorr = np.ones(num_clusters, dtype=bool)
+
+        #    for cluster_idx, _ in clusters.items():
+        #        rho = np.matmul(vmat[cluster_idx],corrs0)
+        #        validcorr[cluster_idx] = np.all(rho >= 0)
+
+
+        #    if bool(np.all(validcorr)):
+        #        print('found valid corr',end='\r')
+        #        break
+
+        temp_results = minimize(F,
+                                corrs0,
+                                method='trust-constr',
+                                args=(vmat, kb, clusters, configs, configcoef,temp,eci,mu),
+                                options=options,
+                                jac=jac,
+                                hess=hess,
+                                constraints=constraints,
+                                bounds=bounds
+                               )
+
+        if temp_results.fun < MIN_RES_VAL:
+            MIN_RES = temp_results
+            MIN_RES_VAL = temp_results.fun
+
+            print(f"Found new minimum for Mu :{mu}, fun: {MIN_RES_VAL:.15f}")
+            print(f'Current minimum correlations: {temp_results.x}')
+            print("Rhos:")
+            for val in temp_results.constr[:num_clusters]:
+                print(np.array2string(val))
+            print(f"Gradient: {np.array2string(temp_results.grad)}")
+            print(f"Stop Status: {temp_results.status} | {temp_results.message}")
+            print('\n====================================\n')
+
+    return MIN_RES
