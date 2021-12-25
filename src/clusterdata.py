@@ -35,8 +35,9 @@ class ClusterInfo:
         try:
             for cluster_idx in self.clusters.keys():
                 assert np.isclose(np.inner(self.configcoef[cluster_idx], np.matmul(self.vmat[cluster_idx], corrs)), 1.0)
+                return True
         except AssertionError:
-            print("Failed to find solution...Current Rho")
+            print("Invalid Rho")
             print(f'Rho: \n {self.rho(corrs)}')
             return 
 

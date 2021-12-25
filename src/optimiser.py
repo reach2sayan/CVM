@@ -19,7 +19,7 @@ def fit(F,
         bounds,
         constraints,
         num_clusters,
-        NN
+        NN,
        ):
 
     random.seed(42)
@@ -35,6 +35,7 @@ def fit(F,
             corrs0 = np.array([1, FIXED_CORR_1, FIXED_CORR_2, *np.random.uniform(-1,1,num_clusters-3)])
         else:
             corrs0 = get_valid_corrs(FIXED_CORR_1,None,vmat,clusters,num_clusters)
+        
 
         temp_results = minimize(F,
                                 corrs0,
@@ -50,19 +51,19 @@ def fit(F,
         if temp_results.fun < MIN_RES_VAL:
             MIN_RES = temp_results
             MIN_RES_VAL = temp_results.fun
-            if NN:
-                print('\n')
-                print(f"Found new minimum for Corr1:{FIXED_CORR_1:.4f}, Corr2:{FIXED_CORR_2:.4f} fun: {MIN_RES_VAL:.15f}")
-            else:
-                print(f"Found new minimum for x:{FIXED_CORR_1:.4f}, T:{temp} fun: {MIN_RES_VAL}")
-
-            print(f'Current minimum correlations: {temp_results.x}')
-            print("Rhos:")
-            for val in temp_results.constr[:num_clusters]:
-                print(np.array2string(val))
-            print(f"Gradient: {np.array2string(temp_results.grad)}")
-            print(f"Stop Status: {temp_results.status} | {temp_results.message}")
-            print('\n====================================\n')
+#            if NN:
+#                print('\n')
+#                print(f"Found new minimum for Corr1:{FIXED_CORR_1:.4f}, Corr2:{FIXED_CORR_2:.4f} fun: {MIN_RES_VAL:.15f}")
+#            else:
+#                print(f"Found new minimum for x:{FIXED_CORR_1:.4f}, T:{temp} fun: {MIN_RES_VAL}")
+#
+#            print(f'Current minimum correlations: {temp_results.x}')
+#            print("Rhos:")
+#            for val in temp_results.constr[:num_clusters]:
+#                print(np.array2string(val))
+#            print(f"Gradient: {np.array2string(temp_results.grad)}")
+#            print(f"Stop Status: {temp_results.status} | {temp_results.message}")
+#            print('\n====================================\n')
 
     return MIN_RES
 

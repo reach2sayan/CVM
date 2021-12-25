@@ -1,0 +1,269 @@
+#!/usr/bin/env python3
+
+import argparse
+import os
+import random
+import glob
+import warnings
+import numpy as np
+import optimiser as opt
+from constraints import Constraints
+from bounds import CorrBounds
+import subprocess
+from energyfunctions import F, F_jacobian, F_hessian
+from clusterdata import ClusterInfo
+
+if __name__ == '__main__':
+
+    cwd = os.getcwd()
+    np.set_printoptions(suppress=True, precision=2)
+    random.seed(42)
+    np.random.seed(seed=42)
+
+    parser = argparse.ArgumentParser(description='CVM SRO Error Correction Code')
+    requiredNamed = parser.add_argument_group('required arguments')
+    requiredNamed.add_argument('--phase',
+                        required=True,
+                        help="name of phase for which correction is to be made",
+                       )
+#    parser.add_argument('--eci',
+#                        help="Skips the ECI fitting step and reads ECI from file",
+#                       )
+    parser.add_argument('--clusters_fit',
+                        default='clusters_fit.out',
+                        help="contain the cluster description for fitting the ECIs (default: %(default)s)",
+                       )
+    parser.add_argument('--maxclus',
+                        default='maxclus.in',
+                        help="contains maximal cluster description for the correction (default: %(default)s)"
+                       )
+    parser.add_argument('--l',
+                        default='lat.in',
+                        help="contains the lattice description of the phase (default: %(default)s)"
+                       )
+    parser.add_argument('--reference_file',
+                        default='ref_structures.in',
+                        help="contains the list of reference structures for the ECI fit (default: %(default)s). If not file of such name is found, then the end-members are chosen as reference."
+                       )
+    parser.add_argument('--T',
+                        default=1000,
+                        type=float,
+                        help="T at which the SRO correction is to be made (default: %(default)s)"
+                       )
+    parser.add_argument('--out',
+                        default=f'energy_sro_corrected',
+                        help="Name of the file to output the SRO corrected energy. (default: %(default)s)"
+                       )
+    parser.add_argument('--verbose', '-v', action='count', default=0,
+                        help="Indicate the verbosity of the fit (default: %(default)s)",
+                       )
+    parser.add_argument('--maxiter',
+                        default=3000,
+                        type=int,
+                        help="Indicate maximum iterations for the local optimiser (default: %(default)s)",
+                       )
+    parser.add_argument('--xtol',
+                        default=1e-12,
+                        type=float,
+                        help="Indicate the acceptable difference between two iterations (default: %(default)s)",
+                       )
+    parser.add_argument('--gtol',
+                        default=1e-12,
+                        type=float,
+                        help="Indicate the acceptable violation of constraints (default: %(default)s)",
+                       )
+    parser.add_argument('--global_trials',
+                        default=100,
+                        type=int,
+                        help="Indicate the number of initial point iteration for global minima search (default: %(default)s)",
+                       )
+    parser.add_argument('--show_warning',
+                        action='store_true',
+                        default=False,
+                        help="Enables to show warning (default: %(default)s)",
+                       )
+
+    args = parser.parse_args()
+
+    if not args.show_warning:
+        warnings.filterwarnings("ignore")
+
+    #gather all structures that are not endmembers and have a valid energy
+    all_nonendmem_structures = []
+
+    for f in glob.glob(f'{cwd}/{args.phase}/sqs_*'):
+        if os.path.isfile(os.path.join(f,'endmem')):
+            continue
+        elif os.path.isfile(os.path.join(f,'energy')) and os.path.getsize(os.path.join(f,'energy')) > 0:
+            all_nonendmem_structures.append(f)
+        else:
+            continue
+
+    for structure in all_nonendmem_structures:
+
+        print('\n============================')
+        print(f"Working on Structure: {structure.split('/')[-1]}")
+        print()
+
+        ref_structures = []
+        try:
+            with open(f'{structure}/{args.reference_file}','r') as ref_file:
+                for line in ref_file.readlines():
+                    ref_structures.append(line)
+        except FileNotFoundError:
+            print(f"{structure.split('/')[-1]} has no reference structure ({args.reference_file}) file. Assuming endmembers as reference.")
+            for f in glob.glob(f'{cwd}/{args.phase}/sqs_*'):
+                if os.path.isfile(os.path.join(f,'endmem')):
+                    ref_structures.append(f)
+        
+        #Fit ECIs
+        energy = {}
+        corrs = {}
+        for struc in [*ref_structures,structure]: 
+            try:
+                with open(f'{struc}/energy','r') as energy_file:
+                    e = float(energy_file.readline())
+                    energy[struc] = e
+                    corr = subprocess.run(['corrdump','-c', f'-cf={cwd}/{args.phase}/{args.clusters_fit}', f'-s={struc}/str.in', f'-l={cwd}/{args.phase}/{args.l}'],
+                                          stdout=subprocess.PIPE,
+                                          stderr=subprocess.PIPE,
+                                          check=True
+                                         )
+
+                    corr = corr.stdout.decode('utf-8').split('\t')[:-1] #convert from bytes to string list
+                    corr = np.array(corr, dtype=np.float32) #convert to arrays
+                    corrs[struc] = corr
+            except FileNotFoundError:
+                print('Energy File (probably of the reference structure) not found.')
+
+        clusters_fit = ClusterInfo.read_clusters(f'{cwd}/{args.phase}/{args.clusters_fit}')
+        NUM_CLUSTERS = len(clusters_fit)
+        """
+        We are doing Ax = b
+        where A = mult_corr
+        and B = energy_fits
+        """
+
+        mult = np.array([cluster['mult'] for cluster in clusters_fit.values()])
+        only_corr = np.array([corr for _ , corr in corrs.items()])
+        energy_fits = np.array([e for _, e in energy.items()])
+        mult_corr = np.array([corr*mult for corr in only_corr])
+        ecis_fitted = np.linalg.solve(mult_corr, energy_fits)
+
+        #Make new ECI file
+        TOT_ECI = len(ClusterInfo.read_clusters(f'{cwd}/{args.phase}/clusters.out'))
+        ecis = np.array([*ecis_fitted, *([0]*(TOT_ECI - len(ecis_fitted)))])
+        with open(f'{structure}/eci.out','w') as eci_file:
+            eci_file.write(f'{TOT_ECI}\n')
+            for eci in ecis:
+                eci_file.write(f'{eci}\n')
+
+        #Generate Full Cluster Description
+        clusters_full = subprocess.run(['cvmclus', f'-m={cwd}/{args.phase}/{args.maxclus}', f'-l={cwd}/{args.phase}/{args.l}'],
+                                       stdout=subprocess.PIPE,
+                                       stderr=subprocess.PIPE,
+                                       cwd=f'{cwd}/{args.phase}/',
+                                       check=True
+                                      )
+        clusters_full = ClusterInfo(f'{cwd}/{args.phase}/clusters.out',
+                            f'{cwd}/{args.phase}/kb.out',
+                            f'{cwd}/{args.phase}/configcoef.out',
+                            f'{cwd}/{args.phase}/config.out',
+                            f'{cwd}/{args.phase}/vmat.out',
+                            f'{structure}/eci.out',
+                           )
+        NUM_CLUSTERS = len(clusters_full.clusters)
+
+        #Check if the fit is done properly
+        full_corrs = {}
+        for struc in [*ref_structures,structure]:
+            corr = subprocess.run(['corrdump','-c', f'-cf={cwd}/{args.phase}/clusters.out', f'-s={struc}/str.in', f'-l={cwd}/{args.phase}/{args.l}'],
+                                  stdout=subprocess.PIPE,
+                                  stderr=subprocess.PIPE,
+                                  check=True
+                                 )
+            corr = corr.stdout.decode('utf-8').split('\t')[:-1] #convert from bytes to string list
+            corr = np.array(corr, dtype=np.float32) #convert to arrays
+            full_corrs[structure] = corr
+
+        for s, full_corr in full_corrs.items():
+            test_E1 = F(full_corr,
+                        clusters_full.vmat,
+                        clusters_full.kb,
+                        clusters_full.clusters,
+                        clusters_full.configs,
+                        clusters_full.configcoef,
+                        0,
+                        clusters_full.eci)
+
+            with open(f'{s}/energy','r') as f:
+                for line in f.readlines():
+                    test_E2 = float(line)
+            assert np.isclose(test_E1, test_E2)
+
+        with open(f'{structure}/energy','r') as f:
+            for line in f.readlines():
+                F_sqs = float(line)
+                print(f"Read in {structure.split('/')[-1]} SQS energy F_sqs: {F_sqs:.2f}")
+
+        corr_rnd = subprocess.run(['corrdump','-c', f'-cf={cwd}/{args.phase}/clusters.out', f'-s={structure}/str.in', f'-l={cwd}/{args.phase}/{args.l}','-rnd'],
+                          stdout=subprocess.PIPE,
+                          stderr=subprocess.PIPE
+                         )
+        corr_rnd = corr_rnd.stdout.decode('utf-8').split('\t')[:-1] #convert from bytes to string list
+        corr_rnd = np.array(corr_rnd, dtype=np.float32) #convert to arrays
+        assert corr_rnd[0] == 1
+        assert clusters_full.check_result_validity(corr_rnd)
+
+        F_rnd = F(corr_rnd,
+                  clusters_full.vmat,
+                  clusters_full.kb,
+                  clusters_full.clusters,
+                  clusters_full.configs,
+                  clusters_full.configcoef,
+                  args.T,
+                  clusters_full.eci)
+        print(f"Calculated CVM energy of completely disordered {structure.split('/')[-1]} F_rnd : {F_rnd:.2f}")
+
+        FIXED_CORR_1 = corr_rnd[1]
+
+        constraints = Constraints(clusters_full.clusters,
+                                  clusters_full.configcoef,
+                                  clusters_full.vmat)
+        bounds = CorrBounds(NUM_CLUSTERS)
+
+        constraints_pd = constraints.get_constraints_phasediagram(FIXED_CORR_1)
+        bounds_pd = bounds.get_pd_bounds(FIXED_CORR_1)
+
+        options = {'verbose' : args.verbose,
+                   'maxiter' : args.maxiter,
+                   'xtol'    : args.xtol,
+                   'gtol'    : args.gtol,
+                   'initial_constr_penalty' : 10
+                  }
+
+        result = opt.fit(F=F,
+                         vmat=clusters_full.vmat, kb=clusters_full.kb,
+                         clusters=clusters_full.clusters,
+                         configs=clusters_full.configs,
+                         configcoef=clusters_full.configcoef,
+                         eci=clusters_full.eci,
+                         temp=args.T,
+                         options=options,
+                         jac=F_jacobian,
+                         hess=F_hessian,
+                         NUM_TRIALS=args.global_trials,
+                         FIXED_CORR_1=FIXED_CORR_1,
+                         FIXED_CORR_2=None,
+                         bounds=bounds_pd,
+                         constraints=constraints_pd,
+                         num_clusters=NUM_CLUSTERS,
+                         NN=False,
+                        )
+
+        F_cvm = result.fun
+        print(f"Calculated optimised CVM energy of {structure.split('/')[-1]} F_cvm : {F_cvm:.2f}")
+        F_solid_solution = F_sqs + F_cvm - F_rnd
+        print(f"SRO Corrected Energy of {structure.split('/')[-1]} F_solid_solution: {F_solid_solution:.2f}")
+        with open(f'{structure}/{args.out}','w') as f:
+            f.write(f'{F_solid_solution}')

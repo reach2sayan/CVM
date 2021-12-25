@@ -85,3 +85,5 @@ dmypy.json
 *.json
 trial.csv
 *.orig
+BCC_A2
+FCC_A1
