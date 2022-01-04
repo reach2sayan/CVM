@@ -1,14 +1,18 @@
 import numpy as np
 from scipy.optimize import LinearConstraint
-from scipy.optimize import NonlinearConstraint
+from energyfunctions import F_hessian
 
 class Constraints:
 
-    def __init__(self,clusters,configcoef,vmat):
+    def __init__(self,vmat,kb,clusters,configs,configcoef,T,eci):
 
         self.vmat = vmat
+        self.kb = kb
         self.clusters = clusters
         self.configcoef = configcoef
+        self.configs = configs
+        self.T = T
+        self.eci = eci
 
         self.constraints = []
 
@@ -35,6 +39,17 @@ class Constraints:
         corrs[1] = FIXED_CORR_1
         """
         return corrs[1] - FIXED_CORR_1   
+
+    def constraint_hessian(self,corrs):
+        """
+        constrains the hessian to be positive definite:
+        by checking if all eigen values are +ve
+        """
+        hess = F_hessian(corrs, self.vmat, self.kb, self.clusters,
+                         self.configs, self.configcoef,self.T, self.eci)
+
+        hess_eigvals, _ = np.linalg.eig(hess)
+        return 1 - int(np.all(hess_eigvals >= 0))
 
     def constraint_zero(self,corrs):
         """
@@ -63,6 +78,36 @@ class Constraints:
                              'type':'eq'
                             }
                            ]
+        return self.constraints
+
+    def get_constraints_sro(self,FIXED_CORR_1,ch):
+
+        if ch:
+            linear_constraints = self.set_linear_constraints()
+            self.constraints = [*linear_constraints,
+                                {'fun': self.constraint_singlet,
+                                 'type':'eq',
+                                 'args':[FIXED_CORR_1]
+                                },
+                                {'fun': self.constraint_zero,
+                                 'type':'eq'
+                                },
+                                {'fun': self.constraint_hessian,
+                                 'type':'eq'
+                                }
+                               ]
+        else:
+            linear_constraints = self.set_linear_constraints()
+            self.constraints = [*linear_constraints,
+                                {'fun': self.constraint_singlet,
+                                 'type':'eq',
+                                 'args':[FIXED_CORR_1]
+                                },
+                                {'fun': self.constraint_zero,
+                                 'type':'eq'
+                                },
+                               ]
+
         return self.constraints
 
     def get_constraints_corrscan(self,FIXED_CORR_1,FIXED_CORR_2):

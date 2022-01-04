@@ -31,7 +31,6 @@ def fit(F,
         print(_,end='\r')
 
         if NN:
-            #corrs0 = get_valid_corrs(FIXED_CORR_1,FIXED_CORR_2,vmat,clusters,num_clusters)
             corrs0 = np.array([1, FIXED_CORR_1, FIXED_CORR_2, *np.random.uniform(-1,1,num_clusters-3)])
         else:
             corrs0 = get_valid_corrs(FIXED_CORR_1,None,vmat,clusters,num_clusters)
@@ -51,19 +50,19 @@ def fit(F,
         if temp_results.fun < MIN_RES_VAL:
             MIN_RES = temp_results
             MIN_RES_VAL = temp_results.fun
-#            if NN:
-#                print('\n')
-#                print(f"Found new minimum for Corr1:{FIXED_CORR_1:.4f}, Corr2:{FIXED_CORR_2:.4f} fun: {MIN_RES_VAL:.15f}")
-#            else:
-#                print(f"Found new minimum for x:{FIXED_CORR_1:.4f}, T:{temp} fun: {MIN_RES_VAL}")
-#
-#            print(f'Current minimum correlations: {temp_results.x}')
-#            print("Rhos:")
-#            for val in temp_results.constr[:num_clusters]:
-#                print(np.array2string(val))
-#            print(f"Gradient: {np.array2string(temp_results.grad)}")
-#            print(f"Stop Status: {temp_results.status} | {temp_results.message}")
-#            print('\n====================================\n')
+            #if NN:
+            #    print('\n')
+            #    print(f"Found new minimum for Corr1:{FIXED_CORR_1:.4f}, Corr2:{FIXED_CORR_2:.4f} fun: {MIN_RES_VAL:.15f}")
+            #else:
+            #    print(f"Found new minimum for x:{FIXED_CORR_1:.4f}, T:{temp} fun: {MIN_RES_VAL}")
+
+            #print(f'Current minimum correlations: {temp_results.x}')
+            #print("Rhos:")
+            #for val in temp_results.constr[:num_clusters]:
+            #    print(np.array2string(val))
+            #print(f"Gradient: {np.array2string(temp_results.grad)}")
+            #print(f"Stop Status: {temp_results.status} | {temp_results.message}")
+            #print('\n====================================\n')
 
     return MIN_RES
 
@@ -92,19 +91,6 @@ def mufit(F,
         print(_,end='\r')
 
         corrs0 = np.array([1,*np.random.uniform(-1,1,num_clusters-1)])
-        #for _ in iter(int,1):
-        #    corrs0 = np.array([1, *np.random.uniform(-1, 1, num_clusters-1)])
-        #    validcorr = np.ones(num_clusters, dtype=bool)
-
-        #    for cluster_idx, _ in clusters.items():
-        #        rho = np.matmul(vmat[cluster_idx],corrs0)
-        #        validcorr[cluster_idx] = np.all(rho >= 0)
-
-
-        #    if bool(np.all(validcorr)):
-        #        print('found valid corr',end='\r')
-        #        break
-
         temp_results = minimize(F,
                                 corrs0,
                                 method='trust-constr',
