@@ -1,22 +1,26 @@
 #!/usr/bin/env python3
+"""
+Code Created By Sayan Samanta and Axel Van de Walle
+"""
 
 import argparse
 import os
 import random
 import glob
 import warnings
+import json
+import subprocess
 import numpy as np
 import optimiser as opt
 from constraints import Constraints
 from bounds import CorrBounds
-import subprocess
 from energyfunctions import F, F_jacobian, F_hessian
 from clusterdata import ClusterInfo
 
 if __name__ == '__main__':
 
     cwd = os.getcwd()
-    np.set_printoptions(suppress=True, precision=2)
+    np.set_printoptions(suppress=True, precision=4)
     random.seed(42)
     np.random.seed(seed=42)
 
@@ -65,10 +69,10 @@ if __name__ == '__main__':
                         type=int,
                         help="No. of temperature points in which the SRO correction is to be evaluated (default: %(default)s)"
                        )
-    parser.add_argument('--out',
-                        default=f'energy_sro_corrected',
-                        help="Name of the file to output the SRO corrected energy. (default: %(default)s)"
-                       )
+#    parser.add_argument('--out',
+#                        default=f'energy_sro_corrected',
+#                        help="Name of the file to output the SRO corrected energy. (default: %(default)s)"
+#                       )
     parser.add_argument('--verbose', '-v', action='count', default=0,
                         help="Indicate the verbosity of the fit (default: %(default)s)",
                        )
@@ -87,21 +91,29 @@ if __name__ == '__main__':
                         type=float,
                         help="Indicate the acceptable violation of constraints (default: %(default)s)",
                        )
-    parser.add_argument('--global_trials',
-                        default=100,
-                        type=int,
-                        help="Indicate the number of initial point iteration for global minima search (default: %(default)s)",
-                       )
+#    parser.add_argument('--global_trials',
+#                        default=1,
+#                        type=int,
+#                        help="Indicate the number of initial point iteration for global minima search (default: %(default)s)",
+#                       )
     parser.add_argument('--show_warning',
                         action='store_true',
                         default=False,
                         help="Enables to show warning (default: %(default)s)",
+                       )
+    parser.add_argument('--out',
+                        default='latest_result.json',
+                        help="Indicates the name of the output file (default: %(default)s)",
                        )
 
     args = parser.parse_args()
 
     if not args.show_warning:
         warnings.filterwarnings("ignore")
+    if args.ch:
+        print("Hessian is constrained to remain +ve definite")
+
+    results_sro = []
 
     #gather all structures that are not endmembers and have a valid energy
     all_nonendmem_structures = []
@@ -109,10 +121,8 @@ if __name__ == '__main__':
     for f in glob.glob(f'{cwd}/{args.phase}/sqs_*'):
         if os.path.isfile(os.path.join(f,'endmem')):
             continue
-        elif os.path.isfile(os.path.join(f,'energy')) and os.path.getsize(os.path.join(f,'energy')) > 0:
+        if os.path.isfile(os.path.join(f,'energy')) and os.path.getsize(os.path.join(f,'energy')) > 0:
             all_nonendmem_structures.append(f)
-        else:
-            continue
 
     for structure in all_nonendmem_structures:
 
@@ -126,7 +136,7 @@ if __name__ == '__main__':
                 for line in ref_file.readlines():
                     ref_structures.append(line)
         except FileNotFoundError:
-            print(f"{structure.split('/')[-1]} has no reference structure ({args.reference_file}) file. Assuming endmembers as reference.")
+            print(f"No reference structure ({args.reference_file}) file. Assuming endmembers as reference.")
             for f in glob.glob(f'{cwd}/{args.phase}/sqs_*'):
                 if os.path.isfile(os.path.join(f,'endmem')):
                     ref_structures.append(f)
@@ -221,12 +231,22 @@ if __name__ == '__main__':
         with open(f'{structure}/energy','r') as f:
             for line in f.readlines():
                 F_sqs = float(line)
-                print(f"Read in {structure.split('/')[-1]} SQS energy F_sqs: {F_sqs:.2f}")
+                print(f"Read in SQS energy\t: {F_sqs:.4f}")
+        
+        def custom_linspace(start,stop,step=1):
+            """
+            Like np.linspace but uses step instead of num
+            This is inclusive to stop, so if start=1, stop=3, step=0.5
+            Output is: array([1., 1.5, 2., 2.5, 3.])
+            """
 
+            return np.linspace(start, stop, int((stop - start) / step + 1))
+        
+        for T in custom_linspace(start=args.Tmin,
+                                 stop=args.Tmax,
+                                 step=args.nTemp):
 
-        for T in np.linspace(args.Tmin,args.Tmax,args.nTemp):
-
-
+            print(f'\nOptimising at temperature {T} K') 
             corr_rnd = subprocess.run(['corrdump','-c', f'-cf={cwd}/{args.phase}/clusters.out', f'-s={structure}/str.in', f'-l={cwd}/{args.phase}/{args.l}','-rnd'],
                                       stdout=subprocess.PIPE,
                                       stderr=subprocess.PIPE
@@ -244,8 +264,8 @@ if __name__ == '__main__':
                       clusters_full.configcoef,
                       T,
                       clusters_full.eci)
-            print(f"Calculated CVM energy of completely disordered {structure.split('/')[-1]} F_rnd : {F_rnd:.2f}")
-            print(f"Correlations of completely disordered {structure.split('/')[-1]} : {corr_rnd}")
+            print(f"Disordered CVM energy\t: {F_rnd:.4f}")
+            print(f"Disordered Correlations\t: {corr_rnd}")
 
             FIXED_CORR_1 = corr_rnd[1]
 
@@ -268,6 +288,7 @@ if __name__ == '__main__':
                        'gtol'    : args.gtol,
                        'initial_constr_penalty' : 10
                       }
+            
             result = opt.fit(F=F,
                              vmat=clusters_full.vmat, kb=clusters_full.kb,
                              clusters=clusters_full.clusters,
@@ -278,18 +299,19 @@ if __name__ == '__main__':
                              options=options,
                              jac=F_jacobian,
                              hess=F_hessian,
-                             NUM_TRIALS=args.global_trials,
+                             NUM_TRIALS=1,
                              FIXED_CORR_1=FIXED_CORR_1,
                              FIXED_CORR_2=None,
                              bounds=bounds_sro,
                              constraints=constraints_sro,
                              num_clusters=NUM_CLUSTERS,
                              NN=False,
+                             corrs_trial=corr_rnd
                             )
 
             F_cvm = result.fun
-            print(f"Calculated optimised CVM energy of {structure.split('/')[-1]} F_cvm : {F_cvm:.2f}")
-            print(f"Correlation of optimised {structure.split('/')[-1]} : {result.x}")
+            print(f"Optimised CVM energy\t: {F_cvm:.4f}")
+            print(f"Optimised Correlation\t: {result.x}")
             hessian = F_hessian(result.x,clusters_full.vmat,
                                 clusters_full.kb,
                                 clusters_full.clusters,
@@ -298,9 +320,25 @@ if __name__ == '__main__':
                                 T,
                                 clusters_full.eci
                                )
-            print(f"Hessian of CVM optimised {structure.split('/')[-1]} :\n {hessian}")
-            print(f"Eigen values of Hessian {structure.split('/')[-1]} : {np.linalg.eigvals(hessian)}") 
+            #print(f"Hessian of CVM optimised {structure.split('/')[-1]} :\n {hessian}")
+            #print(f"Eigen values of Optimised: {np.linalg.eigvals(hessian)}") 
             F_solid_solution = F_sqs + F_cvm - F_rnd
-            print(f"SRO Corrected Energy of {structure.split('/')[-1]} F_solid_solution: {F_solid_solution:.2f}")
-            with open(f'{structure}/{args.out}','w') as f:
-                f.write(f'{F_solid_solution}')
+            results_sro.append({'structure': structure.split('/')[-1],
+                               'temperature': T,
+                               'corrs': list(result.x),
+                               'F_sqs': F_sqs,
+                               'F_rnd': F_rnd,
+                               'F_cvm': F_cvm
+                               }
+                              )
+
+            corrcols = [f'corr {i}' for i in range(NUM_CLUSTERS)]
+            for item in results_sro:
+                for idx, corrnum in enumerate(corrcols):
+                    item[f'{corrnum}'] = item['corrs'][idx]
+
+            with open(args.out,'w') as fout:
+                json.dump(results_sro, fout)
+            #print(f"SRO Corrected Energy \t: {F_solid_solution:.4f}")
+            #with open(f'{structure}/{args.out}','w') as f:
+            #    f.write(f'{F_solid_solution}')

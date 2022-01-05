@@ -1,5 +1,6 @@
 from scipy.optimize import minimize, basinhopping
 from scipy.optimize import SR1, BFGS
+from scipy.optimize import check_grad
 from valid_corr_generator import get_valid_corrs
 import numpy as np
 import random
@@ -20,6 +21,7 @@ def fit(F,
         constraints,
         num_clusters,
         NN,
+        corrs_trial
        ):
 
     random.seed(42)
@@ -34,10 +36,9 @@ def fit(F,
             corrs0 = np.array([1, FIXED_CORR_1, FIXED_CORR_2, *np.random.uniform(-1,1,num_clusters-3)])
         else:
             corrs0 = get_valid_corrs(FIXED_CORR_1,None,vmat,clusters,num_clusters)
-        
 
         temp_results = minimize(F,
-                                corrs0,
+                                corrs_trial,
                                 method='trust-constr',
                                 args=(vmat, kb, clusters, configs, configcoef,temp,eci),
                                 options=options,
@@ -58,7 +59,7 @@ def fit(F,
 
             #print(f'Current minimum correlations: {temp_results.x}')
             #print("Rhos:")
-            #for val in temp_results.constr[:num_clusters]:
+            #for val in temp_results.constr:
             #    print(np.array2string(val))
             #print(f"Gradient: {np.array2string(temp_results.grad)}")
             #print(f"Stop Status: {temp_results.status} | {temp_results.message}")

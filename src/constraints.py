@@ -1,5 +1,6 @@
 import numpy as np
 from scipy.optimize import LinearConstraint
+from scipy.optimize import BFGS
 from energyfunctions import F_hessian
 
 class Constraints:
@@ -47,9 +48,9 @@ class Constraints:
         """
         hess = F_hessian(corrs, self.vmat, self.kb, self.clusters,
                          self.configs, self.configcoef,self.T, self.eci)
-
         hess_eigvals, _ = np.linalg.eig(hess)
-        return 1 - int(np.all(hess_eigvals >= 0))
+        min_hess_eigval = np.amin(hess_eigvals)
+        return min_hess_eigval
 
     def constraint_zero(self,corrs):
         """
@@ -90,10 +91,14 @@ class Constraints:
                                  'args':[FIXED_CORR_1]
                                 },
                                 {'fun': self.constraint_zero,
-                                 'type':'eq'
+                                 'type':'eq',
+                                 'jac':'3-point',
+                                 'hess':BFGS()
                                 },
-                                {'fun': self.constraint_hessian,
-                                 'type':'eq'
+                                {'fun': self.constraint_hessian ,
+                                 'type':'ineq',
+                                 'jac':'3-point',
+                                 'hess':BFGS()
                                 }
                                ]
         else:
