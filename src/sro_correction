@@ -5,7 +5,7 @@ Code Created By Sayan Samanta and Axel Van de Walle
 
 import argparse
 import os
-import random
+import sys
 import glob
 import warnings
 import json
@@ -16,13 +16,14 @@ from constraints import Constraints
 from bounds import CorrBounds
 from energyfunctions import F, F_jacobian, F_hessian
 from clusterdata import ClusterInfo
+from logger import Logger
 
 if __name__ == '__main__':
 
     cwd = os.getcwd()
     np.set_printoptions(suppress=True, precision=4)
-    random.seed(42)
-    np.random.seed(seed=42)
+#    random.seed(42)
+#    np.random.seed(seed=42)
 
     parser = argparse.ArgumentParser(description='CVM SRO Error Correction Code')
     required = parser.add_argument_group('required arguments')
@@ -91,23 +92,33 @@ if __name__ == '__main__':
                         type=float,
                         help="Indicate the acceptable violation of constraints (default: %(default)s)",
                        )
-#    parser.add_argument('--global_trials',
-#                        default=1,
-#                        type=int,
-#                        help="Indicate the number of initial point iteration for global minima search (default: %(default)s)",
-#                       )
+    parser.add_argument('--global_trials',
+                        default=1,
+                        type=int,
+                        help="Indicate the number of initial point iteration for global minima search (default: %(default)s)",
+                       )
     parser.add_argument('--show_warning',
                         action='store_true',
                         default=False,
                         help="Enables to show warning (default: %(default)s)",
                        )
     parser.add_argument('--out',
-                        default='latest_result.json',
+                        default=f'{cwd}/latest_result.json',
                         help="Indicates the name of the output file (default: %(default)s)",
+                       )
+    parser.add_argument('--toscreen',
+                        action='store_true',
+                        default=False,
+                        help="Enable logging to screen (default: %(default)s)",
+                       )
+    parser.add_argument('--logfile',
+                        default=f'{cwd}/log.out',
+                        help="Filename for the log file (default: %(default)s)"
                        )
 
     args = parser.parse_args()
 
+    sys.stdout = Logger(sys.stdout, args.logfile, args.toscreen)
     if not args.show_warning:
         warnings.filterwarnings("ignore")
     if args.ch:
@@ -299,7 +310,7 @@ if __name__ == '__main__':
                              options=options,
                              jac=F_jacobian,
                              hess=F_hessian,
-                             NUM_TRIALS=1,
+                             NUM_TRIALS=args.global_trials,
                              FIXED_CORR_1=FIXED_CORR_1,
                              FIXED_CORR_2=None,
                              bounds=bounds_sro,

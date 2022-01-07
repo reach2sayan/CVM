@@ -1,16 +1,19 @@
-from scipy.optimize import minimize, basinhopping
-from scipy.optimize import SR1, BFGS
-from scipy.optimize import check_grad
-from valid_corr_generator import get_valid_corrs
-import numpy as np
+"""
+Optimiser module for SRO Correction
+"""
+
 import random
+import numpy as np
+from scipy.optimize import minimize
+from scipy.optimize import BFGS
+from valid_corr_generator import get_valid_corrs
 
 def fit(F,
-        vmat, kb, 
-        clusters, 
+        vmat, kb,
+        clusters,
         configs, configcoef,
-        temp, 
-        eci, 
+        temp,
+        eci,
         options,
         jac,
         hess,
@@ -24,19 +27,21 @@ def fit(F,
         corrs_trial
        ):
 
-    random.seed(42)
+#    random.seed(42)
 
     MIN_RES = None 
     MIN_RES_VAL = 1e5 #random large number
     for _ in range(NUM_TRIALS):
 
-        print(_,end='\r')
+#        print(_,end='\r')
 
         if NN:
             corrs0 = np.array([1, FIXED_CORR_1, FIXED_CORR_2, *np.random.uniform(-1,1,num_clusters-3)])
         else:
             corrs0 = get_valid_corrs(FIXED_CORR_1,None,vmat,clusters,num_clusters)
 
+        jitter = np.array([0, 0, *np.random.normal(0, .001, corrs_trial[2:].shape)]) 
+        corrs_trial = corrs_trial+jitter
         temp_results = minimize(F,
                                 corrs_trial,
                                 method='trust-constr',
