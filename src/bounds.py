@@ -20,6 +20,7 @@ class CorrBounds:
 
         bounds_corrs = Bounds([1, FIXED_CORR_1, FIXED_CORR_2, *[-1]*(self.num_clusters-3)],
                               [1, FIXED_CORR_1, FIXED_CORR_2, *[1]*(self.num_clusters-3)],
+                              keep_feasible=True
                              )
         return bounds_corrs
 
@@ -27,5 +28,6 @@ class CorrBounds:
 
         bounds_corrs = Bounds([1, *[-1]*(self.num_clusters-1)],
                               [1, *[1]*(self.num_clusters-1)],
+                              keep_feasible=True
                              )
         return bounds_corrs

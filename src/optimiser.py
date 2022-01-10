@@ -25,7 +25,8 @@ def fit(F,
         constraints,
         num_clusters,
         NN,
-        corrs_trial
+        corrs_trial,
+        ch
        ):
 
 #    random.seed(42)
@@ -35,7 +36,15 @@ def fit(F,
                        configs, configcoef,temp, eci)
         #        hess_eigvals, _ = np.linalg.eig(hess)
         hess_eigvals = np.real(eigvals(hessian))
-        assert all(h >= 0 for h in hess_eigvals)
+        with open(f'hessians-{int(ch)}','a') as hess_file:
+            hess_file.write(np.array2string(hess_eigvals)+'\n')
+        try:
+            assert all(h >= 0 for h in hess_eigvals)
+        except AssertionError:
+            if ch:
+                print('VERY SERIOUS ERROR. Negative Hessian')
+            else:
+                print('WARNING: Negative Hessian')
 
 
     MIN_RES = None 
@@ -44,6 +53,11 @@ def fit(F,
         corrs0 = np.array([1, FIXED_CORR_1, FIXED_CORR_2, *np.random.uniform(-1,1,num_clusters-3)])
     else:
         corrs0 = get_valid_corrs(FIXED_CORR_1,None,vmat,clusters,num_clusters)
+
+    if ch:
+        callback = sro_callback
+    else:
+        callback = sro_callback
     for _ in range(NUM_TRIALS):
 
         #print(_,end='\r')
@@ -59,7 +73,7 @@ def fit(F,
                                 hess=hess,
                                 constraints=constraints,
                                 bounds=bounds,
-                                callback=sro_callback
+                                callback=callback
                       )
 
         if temp_results.fun < MIN_RES_VAL:
@@ -78,15 +92,12 @@ def fit(F,
             
             hessian = hess(temp_results.x, vmat, kb, clusters,
                              configs, configcoef,temp, eci)
-            #        hess_eigvals, _ = np.linalg.eig(hess)
             hess_eigvals = np.real(eigvals(hessian))
             min_hess_eigval = np.amin(hess_eigvals)
             print(f"Eigen Values of Hessian: {hess_eigvals}")
             print(f"Gradient: {np.array2string(temp_results.grad)}")
             print(f"Stop Status: {temp_results.status} | {temp_results.message}")
             print('\n====================================\n')
-
-        #corrs_trial = temp_results.x
 
     return MIN_RES
 

@@ -1,3 +1,6 @@
+"""
+Constrain the constraints class defining the different constrains
+"""
 import numpy as np
 from scipy.optimize import LinearConstraint
 from scipy.optimize import BFGS
@@ -27,11 +30,15 @@ class Constraints:
             if cluster_idx == 0:
                 linear_constraints.append(LinearConstraint(self.vmat[cluster_idx],
                                                            [1]*len(self.configcoef[cluster_idx]),
-                                                           [1]*len(self.configcoef[cluster_idx])))
+                                                           [1]*len(self.configcoef[cluster_idx]),
+                                                           keep_feasible=True
+                                                          ))
             else:
                 linear_constraints.append(LinearConstraint(self.vmat[cluster_idx],
                                                            [0]*len(self.configcoef[cluster_idx]),
-                                                           [1]*len(self.configcoef[cluster_idx])))
+                                                           [1]*len(self.configcoef[cluster_idx]),
+                                                           keep_feasible=True
+                                                          ))
 
         return linear_constraints
 
@@ -51,6 +58,7 @@ class Constraints:
                          self.configs, self.configcoef,self.T, self.eci)
         hess_eigvals = np.real(eigvals(hess))
         min_hess_eigval = np.amin(hess_eigvals)
+        
         return min_hess_eigval
 
     def constraint_zero(self,corrs):
@@ -65,7 +73,7 @@ class Constraints:
         constrains the 2-pt correlation:
         corrs[2] = FIXED_CORR_2
         """
-        return corrs[2] - FIXED_CORR_2 
+        return corrs[2] - FIXED_CORR_2
  
     def get_constraints_phasediagram(self,FIXED_CORR_1):
 
@@ -93,13 +101,9 @@ class Constraints:
                                 },
                                 {'fun': self.constraint_zero,
                                  'type':'eq',
-                       #          'jac':'3-point',
-                       #          'hess':BFGS()
                                 },
                                 {'fun': self.constraint_hessian ,
                                  'type':'ineq',
-#                                 'jac':'3-point',
-#                                 'hess':BFGS()
                                 }
                                ]
         else:

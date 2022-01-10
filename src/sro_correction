@@ -317,7 +317,8 @@ if __name__ == '__main__':
                              constraints=constraints_sro,
                              num_clusters=NUM_CLUSTERS,
                              NN=False,
-                             corrs_trial=corr_rnd
+                             corrs_trial=corr_rnd,
+                             ch=args.ch
                             )
             F_cvm = result.fun
             print(f"Optimised CVM energy\t: {F_cvm:.4f}")
