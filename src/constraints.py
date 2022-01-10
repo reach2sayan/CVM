@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.optimize import LinearConstraint
 from scipy.optimize import BFGS
+from scipy.linalg import eigvals
 from energyfunctions import F_hessian
 
 class Constraints:
@@ -48,7 +49,7 @@ class Constraints:
         """
         hess = F_hessian(corrs, self.vmat, self.kb, self.clusters,
                          self.configs, self.configcoef,self.T, self.eci)
-        hess_eigvals, _ = np.linalg.eig(hess)
+        hess_eigvals = np.real(eigvals(hess))
         min_hess_eigval = np.amin(hess_eigvals)
         return min_hess_eigval
 
@@ -92,13 +93,13 @@ class Constraints:
                                 },
                                 {'fun': self.constraint_zero,
                                  'type':'eq',
-                                 'jac':'3-point',
-                                 'hess':BFGS()
+                       #          'jac':'3-point',
+                       #          'hess':BFGS()
                                 },
                                 {'fun': self.constraint_hessian ,
                                  'type':'ineq',
-                                 'jac':'3-point',
-                                 'hess':BFGS()
+#                                 'jac':'3-point',
+#                                 'hess':BFGS()
                                 }
                                ]
         else:

@@ -299,7 +299,7 @@ if __name__ == '__main__':
                        'gtol'    : args.gtol,
                        'initial_constr_penalty' : 10
                       }
-            
+
             result = opt.fit(F=F,
                              vmat=clusters_full.vmat, kb=clusters_full.kb,
                              clusters=clusters_full.clusters,
@@ -319,7 +319,6 @@ if __name__ == '__main__':
                              NN=False,
                              corrs_trial=corr_rnd
                             )
-
             F_cvm = result.fun
             print(f"Optimised CVM energy\t: {F_cvm:.4f}")
             print(f"Optimised Correlation\t: {result.x}")

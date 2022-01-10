@@ -14,6 +14,7 @@ import subprocess
 import multiprocessing as mp
 import numpy as np
 import optimiser as opt
+import tqdm
 from constraints import Constraints
 from bounds import CorrBounds
 from energyfunctions import F, F_jacobian, F_hessian
@@ -138,7 +139,7 @@ def optimiser_wrapper(param_dict):
     corrs_trial= param_dict['corrs_trial']
     F_sqs = param_dict['F_sqs']
     F_rnd = param_dict['F_rnd']
-    print(temp)
+    print(f'Working with temperature {temp}...')
 
     result = opt.fit(F=F,
                      vmat=vmat, kb=kb,
@@ -206,7 +207,6 @@ if __name__ == '__main__':
 
     print('\n============================')
     print(f"Working on Structure: {structure.split('/')[-1]}")
-    print()
 
     ref_structures = []
     try:
@@ -398,4 +398,6 @@ if __name__ == '__main__':
     
     executionTime = (time.time() - startTime)
     print('Execution time in seconds: ' + str(executionTime))
+    with open('time_taken','w') as ft:
+        ft.write(str(executionTime))
 
