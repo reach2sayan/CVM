@@ -1,5 +1,6 @@
 import numpy as np
 import math
+#import autograd.numpy as np
 
 
 kB = 8.617330337217213e-05
@@ -26,7 +27,7 @@ def F(corrs, vmat, kb, clusters, configs, configcoef,T,eci):
             return 0
             #corrsum = np.finfo(float).tiny
 
-        return corrsum * math.log(np.abs(corrsum))
+        return corrsum * np.log(np.abs(corrsum))
     
     def per_cluster_sum(corrs,vmat,configcoef):
         config_sum = np.sum([coef * get_corrsum(vmat[config_idx],corrs) for config_idx, coef in enumerate(configcoef)
@@ -251,7 +252,7 @@ def F_hessian_mu(corrs, vmat, kb, clusters, configs, configcoef,T,eci,mu):
 
     d2F = np.array([[get_hessian_elem(corrs, vmat, kb, clusters, configs, configcoef, T, eci, corr_idx_1, corr_idx_2) for corr_idx_2, _ in enumerate(corrs)] for corr_idx_1, _ in enumerate(corrs)])
 
-    return d2F
+    return kB*T*d2F
 
 def F_hessian(corrs, vmat, kb, clusters, configs, configcoef,T,eci):
     """
@@ -309,4 +310,4 @@ def F_hessian(corrs, vmat, kb, clusters, configs, configcoef,T,eci):
 
     d2F = np.array([[get_hessian_elem(corrs, vmat, kb, clusters, configs, configcoef, T, eci, corr_idx_1, corr_idx_2) for corr_idx_2, _ in enumerate(corrs)] for corr_idx_1, _ in enumerate(corrs)])
 
-    return d2F
+    return kB*T*d2F

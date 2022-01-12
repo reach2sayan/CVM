@@ -13,6 +13,7 @@ class CorrBounds:
 
         bounds_corrs = Bounds([1, FIXED_CORR_1, *[-1]*(self.num_clusters-2)],
                               [1, FIXED_CORR_1, *[1]*(self.num_clusters-2)],
+            #                  keep_feasible=True
                              )
         return bounds_corrs
 

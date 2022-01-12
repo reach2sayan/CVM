@@ -5,8 +5,8 @@ import numpy as np
 from scipy.optimize import LinearConstraint
 from scipy.optimize import BFGS
 from scipy.linalg import eigvals
-from energyfunctions import F_hessian
-
+from energyfunctions import F,F_hessian
+from autograd import hessian
 class Constraints:
 
     def __init__(self,vmat,kb,clusters,configs,configcoef,T,eci):

@@ -10,7 +10,8 @@ import glob
 import warnings
 import json
 import subprocess
-import numpy as np
+#import numpy as np
+import autograd.numpy as np
 import optimiser as opt
 from constraints import Constraints
 from bounds import CorrBounds
@@ -308,7 +309,7 @@ if __name__ == '__main__':
                              eci=clusters_full.eci,
                              temp=T,
                              options=options,
-                             jac=F_jacobian,
+                             jac='3-point',
                              hess=F_hessian,
                              NUM_TRIALS=args.global_trials,
                              FIXED_CORR_1=FIXED_CORR_1,
