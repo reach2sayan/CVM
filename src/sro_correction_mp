@@ -14,7 +14,6 @@ import subprocess
 import multiprocessing as mp
 import numpy as np
 import optimiser as opt
-import tqdm
 from constraints import Constraints
 from bounds import CorrBounds
 from energyfunctions import F, F_jacobian, F_hessian
@@ -55,45 +54,45 @@ def get_parsed_args():
                         help="contains the list of reference structures for the ECI fit (default: %(default)s). If not file of such name is found, then the end-members are chosen as reference."
                        )
     parser.add_argument('--Tmin',
-                        default=0,
+                        default=100,
                         type=int,
                         help="Minimum T at which the SRO correction is to be made (default: %(default)s)"
                        )
     parser.add_argument('--Tmax',
-                        default=5000,
+                        default=2000,
                         type=int,
                         help="Maximum T at which the SRO correction is to be made (default: %(default)s)"
                        )
     parser.add_argument('--nTemp',
-                        default=11,
+                        default=100,
                         type=int,
-                        help="No. of temperature points in which the SRO correction is to be evaluated (default: %(default)s)"
+                        help="Temperature steps to take which the SRO correction is to be evaluated (default: %(default)s)"
                        )
     parser.add_argument('--verbose', '-v', action='count', default=0,
                         help="Indicate the verbosity of the fit (default: %(default)s)",
                        )
     parser.add_argument('--maxiter',
-                        default=3000,
+                        default=5000,
                         type=int,
                         help="Indicate maximum iterations for the local optimiser (default: %(default)s)",
                        )
     parser.add_argument('--np',
-                        default=1,
+                        default=-1,
                         type=int,
-                        help="No. of processes over which the optimisation would be divided (default: 1)",
+                        help="No. of processes over which the optimisation would be divided (default: no. of temperature points)",
                        )
     parser.add_argument('--xtol',
-                        default=1e-12,
+                        default=1e-18,
                         type=float,
                         help="Indicate the acceptable difference between two iterations (default: %(default)s)",
                        )
     parser.add_argument('--gtol',
-                        default=1e-12,
+                        default=1e-18,
                         type=float,
                         help="Indicate the acceptable violation of constraints (default: %(default)s)",
                        )
     parser.add_argument('--global_trials',
-                        default=20,
+                        default=1,
                         type=int,
                         help="Indicate the number of initial point iteration for global minima search (default: %(default)s)",
                        )
@@ -118,7 +117,7 @@ def get_parsed_args():
 
     return parser.parse_args()
 
-def optimiser_wrapper(param_dict):
+def optimiser_wrapper(param_dict,temperature):
 
     vmat = param_dict['vmat']
     kb = param_dict['kb']
@@ -126,7 +125,6 @@ def optimiser_wrapper(param_dict):
     configs = param_dict['configs']
     configcoef = param_dict['configcoef']
     eci = param_dict['eci']
-    temp = param_dict['T']
     options = param_dict['options']
     F = param_dict['F']
     jac = param_dict['jac']
@@ -139,7 +137,8 @@ def optimiser_wrapper(param_dict):
     corrs_trial= param_dict['corrs_trial']
     F_sqs = param_dict['F_sqs']
     F_rnd = param_dict['F_rnd']
-    print(f'Working with temperature {temp}...')
+    ch = param_dict['ch']
+    print(f'Working with temperature {temperature}...')
 
     result = opt.fit(F=F,
                      vmat=vmat, kb=kb,
@@ -147,7 +146,7 @@ def optimiser_wrapper(param_dict):
                      configs=configs,
                      configcoef=configcoef,
                      eci=eci,
-                     temp=temp,
+                     temp=temperature,
                      options=options,
                      jac=jac,
                      hess=hess,
@@ -158,7 +157,8 @@ def optimiser_wrapper(param_dict):
                      constraints=constraints,
                      num_clusters=num_clusters,
                      NN=False,
-                     corrs_trial=corrs_trial
+                     corrs_trial=corrs_trial,
+                     ch=ch
                     )
 
     F_cvm = result.fun
@@ -176,7 +176,7 @@ def optimiser_wrapper(param_dict):
     #print(f"Eigen values of Optimised: {np.linalg.eigvals(hessian)}") 
     F_solid_solution = F_sqs + F_cvm - F_rnd
     results_sro = {'structure': structure.split('/')[-1],
-                   'temperature': temp,
+                   'temperature': temperature,
                    'corrs': list(result.x),
                    'F_sqs': F_sqs,
                    'F_rnd': F_rnd,
@@ -354,18 +354,19 @@ if __name__ == '__main__':
     param_dict['NN'] = False
     param_dict['corrs_trial'] = corr_rnd
     param_dict['F_sqs'] = F_sqs
+    param_dict['ch'] = args.ch
     
     pool = mp.Pool(processes=mp.cpu_count())
-    T = list(custom_linspace(start=args.Tmin,stop=args.Tmax, step=args.nTemp))
+    temperature_list = list(custom_linspace(start=args.Tmin,stop=args.Tmax, step=args.nTemp))
     param_list = []
-    for temp in T:
+    for temperature in temperature_list:
         param_dict_temp = param_dict.copy()
         constraints = Constraints(clusters_full.vmat,
                                   clusters_full.kb,
                                   clusters_full.clusters,
                                   clusters_full.configs,
                                   clusters_full.configcoef,
-                                  temp,
+                                  temperature,
                                   clusters_full.eci
                                  )
         constraints_sro = constraints.get_constraints_sro(FIXED_CORR_1,args.ch)
@@ -376,28 +377,18 @@ if __name__ == '__main__':
                   clusters_full.clusters,
                   clusters_full.configs,
                   clusters_full.configcoef,
-                  temp,
+                  temperature,
                   clusters_full.eci)
         param_dict_temp['F_rnd'] = F_rnd
-        print(f"Disordered CVM energy\t @ T = {temp} : {F_rnd:.4f}")
-        param_dict_temp['T'] = temp
+        print(f"Disordered CVM energy\t @ T = {temperature} : {F_rnd:.4f}")
         param_list.append(param_dict_temp)
 
-    import time
-    startTime = time.time()
-    
     if args.np == -1:
-        processes = mp.cpu_count()
+        processes = len(temperature_list) 
     else:
         processes = args.np
 
     with mp.Pool(processes=processes) as pool:
-        result = pool.map(optimiser_wrapper,param_list)
+        result = pool.starmap(optimiser_wrapper,zip(param_list,temperature_list))
     with open(f'{args.out}','w') as fout:
         json.dump(result, fout)
-    
-    executionTime = (time.time() - startTime)
-    print('Execution time in seconds: ' + str(executionTime))
-    with open('time_taken','w') as ft:
-        ft.write(str(executionTime))
-

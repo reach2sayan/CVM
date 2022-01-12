@@ -10,8 +10,8 @@ import glob
 import warnings
 import json
 import subprocess
-#import numpy as np
-import autograd.numpy as np
+import numpy as np
+#import autograd.numpy as np
 import optimiser as opt
 from constraints import Constraints
 from bounds import CorrBounds
@@ -32,7 +32,7 @@ if __name__ == '__main__':
                         required=True,
                         help="name of phase for which correction is to be made",
                        )
-    required.add_argument('--ch',
+    parser.add_argument('--ch',
                           action='store_true',
                           default=False,
                           help="performs a inflection-detection optimisation to estimate disordered state at low T (default: %(default)s)"
@@ -57,19 +57,19 @@ if __name__ == '__main__':
                         help="contains the list of reference structures for the ECI fit (default: %(default)s). If not file of such name is found, then the end-members are chosen as reference."
                        )
     parser.add_argument('--Tmin',
-                        default=0,
+                        default=100,
                         type=int,
                         help="Minimum T at which the SRO correction is to be made (default: %(default)s)"
                        )
     parser.add_argument('--Tmax',
-                        default=5000,
+                        default=2000,
                         type=int,
                         help="Maximum T at which the SRO correction is to be made (default: %(default)s)"
                        )
     parser.add_argument('--nTemp',
-                        default=11,
+                        default=100,
                         type=int,
-                        help="No. of temperature points in which the SRO correction is to be evaluated (default: %(default)s)"
+                        help="Temperature increment steps in which the SRO correction is to be evaluated (default: %(default)s)"
                        )
 #    parser.add_argument('--out',
 #                        default=f'energy_sro_corrected',
@@ -79,17 +79,17 @@ if __name__ == '__main__':
                         help="Indicate the verbosity of the fit (default: %(default)s)",
                        )
     parser.add_argument('--maxiter',
-                        default=3000,
+                        default=5000,
                         type=int,
                         help="Indicate maximum iterations for the local optimiser (default: %(default)s)",
                        )
     parser.add_argument('--xtol',
-                        default=1e-12,
+                        default=1e-18,
                         type=float,
                         help="Indicate the acceptable difference between two iterations (default: %(default)s)",
                        )
     parser.add_argument('--gtol',
-                        default=1e-12,
+                        default=1e-18,
                         type=float,
                         help="Indicate the acceptable violation of constraints (default: %(default)s)",
                        )

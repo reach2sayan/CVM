@@ -5,8 +5,7 @@ import numpy as np
 from scipy.optimize import LinearConstraint
 from scipy.optimize import BFGS
 from scipy.linalg import eigvals
-from energyfunctions import F,F_hessian
-from autograd import hessian
+from energyfunctions import F_hessian
 class Constraints:
 
     def __init__(self,vmat,kb,clusters,configs,configcoef,T,eci):
@@ -57,9 +56,7 @@ class Constraints:
         hess = F_hessian(corrs, self.vmat, self.kb, self.clusters,
                          self.configs, self.configcoef,self.T, self.eci)
         hess_eigvals = np.real(eigvals(hess))
-        min_hess_eigval = np.amin(hess_eigvals)
-        
-        return min_hess_eigval
+        return np.amin(hess_eigvals)
 
     def constraint_zero(self,corrs):
         """
