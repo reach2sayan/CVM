@@ -26,7 +26,8 @@ def fit(F,
         num_clusters,
         NN,
         corrs_trial,
-        ch
+        ch,
+        display_inter=True
        ):
 
     def sro_callback(xk,state):
@@ -51,7 +52,8 @@ def fit(F,
 
     for _ in range(NUM_TRIALS):
 
-        print(f'Trial Corrs {_}: {corrs_trial}')
+        if display_inter:
+            print(f'Trial Corrs {_}: {corrs_trial}')
         jitter = np.array([0, 0, *np.random.normal(0, .001, corrs_trial[2:].shape)])
         corrs_trial = corrs_trial+jitter
         temp_results = minimize(F,
@@ -63,27 +65,28 @@ def fit(F,
                                 hess=hess,
                                 constraints=constraints,
                                 bounds=bounds,
-                                callback=sro_callback,
+#                                callback=sro_callback,
                                )
 
         if temp_results.fun < MIN_RES_VAL:
             MIN_RES = temp_results
             MIN_RES_VAL = temp_results.fun
-            if NN:
-                print('\n')
-                print(f"Found new minimum for Corr1:{FIXED_CORR_1:.4f}, Corr2:{FIXED_CORR_2:.4f} fun: {MIN_RES_VAL:.15f}")
-            else:
-                print(f"Found new minimum for x:{FIXED_CORR_1:.4f}, T:{temp} fun: {MIN_RES_VAL}")
+            if display_inter:
+                if NN:
+                    print('\n')
+                    print(f"Found new minimum for Corr1:{FIXED_CORR_1:.4f}, Corr2:{FIXED_CORR_2:.4f} fun: {MIN_RES_VAL:.15f}")
+                else:
+                    print(f"Found new minimum for x:{FIXED_CORR_1:.4f}, T:{temp} fun: {MIN_RES_VAL}")
 
-            print(f'Current minimum correlations: {temp_results.x}')
-            hessian = hess(temp_results.x, vmat, kb, clusters,
-                             configs, configcoef,temp, eci)
-            hess_eigvals = np.real(eigvals(hessian))
-            min_hess_eigval = np.amin(hess_eigvals)
-            print(f"Eigen Values of Hessian: {hess_eigvals}")
-            print(f"Gradient: {np.array2string(temp_results.grad)}")
-            print(f"Stop Status: {temp_results.status} | {temp_results.message}")
-            print('\n====================================\n')
+                print(f'Current minimum correlations: {temp_results.x}')
+                hessian = hess(temp_results.x, vmat, kb, clusters,
+                                 configs, configcoef,temp, eci)
+                hess_eigvals = np.real(eigvals(hessian))
+                min_hess_eigval = np.amin(hess_eigvals)
+                print(f"Eigen Values of Hessian: {hess_eigvals}")
+                print(f"Gradient: {np.array2string(temp_results.grad)}")
+                print(f"Stop Status: {temp_results.status} | {temp_results.message}")
+                print('\n====================================\n')
 
     return MIN_RES
 

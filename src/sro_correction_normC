@@ -11,20 +11,19 @@ import warnings
 import json
 import subprocess
 import numpy as np
-#import autograd.numpy as np
 import optimiser as opt
 from constraints import Constraints
 from bounds import CorrBounds
-from energyfunctions import F, F_jacobian, F_hessian
+from energyfunctions import F, F_jacobian, F_hessian, S, S_jacobian, S_hessian
 from clusterdata import ClusterInfo
 from logger import Logger
+from scipy.spatial.distance import cdist
 
 if __name__ == '__main__':
 
     cwd = os.getcwd()
     np.set_printoptions(suppress=True, precision=4)
-#    random.seed(42)
-#    np.random.seed(seed=42)
+    np.random.seed(seed=42)
 
     parser = argparse.ArgumentParser(description='CVM SRO Error Correction Code')
     required = parser.add_argument_group('required arguments')
@@ -244,7 +243,69 @@ if __name__ == '__main__':
             for line in f.readlines():
                 F_sqs = float(line)
                 print(f"Read in SQS energy\t: {F_sqs:.4f}")
-        
+
+        corr_rnd = subprocess.run(['corrdump','-c', f'-cf={cwd}/{args.phase}/clusters.out', f'-s={structure}/str.in', f'-l={cwd}/{args.phase}/{args.l}','-rnd'],
+                                  stdout=subprocess.PIPE,
+                                  stderr=subprocess.PIPE
+                                 )
+        corr_rnd = corr_rnd.stdout.decode('utf-8').split('\t')[:-1] #convert from bytes to string list
+        corr_rnd = np.array(corr_rnd, dtype=np.float32) #convert to arrays
+        assert corr_rnd[0] == 1
+        assert clusters_full.check_result_validity(corr_rnd)
+
+        #find ordered correlation
+        FIXED_CORR_1_ORD = corr_rnd[1]
+
+        constraints = Constraints(clusters_full.vmat,
+                                  clusters_full.kb,
+                                  clusters_full.clusters,
+                                  clusters_full.configs,
+                                  clusters_full.configcoef,
+                                  0,
+                                  clusters_full.eci
+                                 )
+        bounds = CorrBounds(NUM_CLUSTERS)
+
+        constraints_ord = constraints.get_constraints_phasediagram(FIXED_CORR_1_ORD)
+        bounds_ord = bounds.get_pd_bounds(FIXED_CORR_1_ORD)
+
+        options = {'verbose' : args.verbose,
+                   'maxiter' : args.maxiter,
+                   'xtol'    : args.xtol,
+                   'gtol'    : args.gtol,
+                   'initial_constr_penalty' : 10
+                  }
+
+        print('Calculating Ordered Correlation....')
+        result_ord = opt.fit(F=S,
+                             vmat=clusters_full.vmat, kb=clusters_full.kb,
+                             clusters=clusters_full.clusters,
+                             configs=clusters_full.configs,
+                             configcoef=clusters_full.configcoef,
+                             eci=clusters_full.eci,
+                             temp=0,
+                             options=options,
+                             jac=S_jacobian,
+                             hess=S_hessian,
+                             NUM_TRIALS=20,
+                             FIXED_CORR_1=FIXED_CORR_1_ORD,
+                             FIXED_CORR_2=None,
+                             bounds=bounds_ord,
+                             constraints=constraints_ord,
+                             num_clusters=NUM_CLUSTERS,
+                             NN=False,
+                             corrs_trial=corr_rnd,
+                             ch=False,
+                             display_inter=False
+                            )
+
+        corr_ord = result_ord.x
+        print(f"Ordered correlation\t: {corr_ord}")
+
+        ord2disord_dist = np.linalg.norm(corr_ord - corr_rnd)
+        print(f"L2 norm between the fully disordered and ordered state:\t {ord2disord_dist}")
+        print('\n========================================\n')
+        print('Starting T optimisation...norm constraint enabled..\n')
         def custom_linspace(start,stop,step=1):
             """
             Like np.linspace but uses step instead of num
@@ -253,20 +314,13 @@ if __name__ == '__main__':
             """
 
             return np.linspace(start, stop, int((stop - start) / step + 1))
-        
+
+
         for T in custom_linspace(start=args.Tmin,
                                  stop=args.Tmax,
                                  step=args.nTemp):
 
             print(f'\nOptimising at temperature {T} K') 
-            corr_rnd = subprocess.run(['corrdump','-c', f'-cf={cwd}/{args.phase}/clusters.out', f'-s={structure}/str.in', f'-l={cwd}/{args.phase}/{args.l}','-rnd'],
-                                      stdout=subprocess.PIPE,
-                                      stderr=subprocess.PIPE
-                                     )
-            corr_rnd = corr_rnd.stdout.decode('utf-8').split('\t')[:-1] #convert from bytes to string list
-            corr_rnd = np.array(corr_rnd, dtype=np.float32) #convert to arrays
-            assert corr_rnd[0] == 1
-            assert clusters_full.check_result_validity(corr_rnd)
 
             F_rnd = F(corr_rnd,
                       clusters_full.vmat,
@@ -291,7 +345,7 @@ if __name__ == '__main__':
                                      )
             bounds = CorrBounds(NUM_CLUSTERS)
 
-            constraints_sro = constraints.get_constraints_hessian(FIXED_CORR_1,args.ch)
+            constraints_sro = constraints.get_constraints_sro(FIXED_CORR_1,ord2disord_dist,corr_rnd)
             bounds_sro = bounds.get_pd_bounds(FIXED_CORR_1)
 
             options = {'verbose' : args.verbose,
@@ -309,7 +363,7 @@ if __name__ == '__main__':
                              eci=clusters_full.eci,
                              temp=T,
                              options=options,
-                             jac='3-point',
+                             jac=F_jacobian,
                              hess=F_hessian,
                              NUM_TRIALS=args.global_trials,
                              FIXED_CORR_1=FIXED_CORR_1,

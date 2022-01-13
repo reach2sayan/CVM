@@ -71,7 +71,25 @@ class Constraints:
         corrs[2] = FIXED_CORR_2
         """
         return corrs[2] - FIXED_CORR_2
- 
+
+    def get_constraints_sro(self,FIXED_CORR_1,ord2disord_dist,corr_rnd):
+
+        linear_constraints = self.set_linear_constraints()
+
+        self.constraints = [*linear_constraints,
+                            {'fun': self.constraint_singlet,
+                             'type':'eq',
+                             'args':[FIXED_CORR_1]
+                            },
+                            {'fun': self.constraint_zero,
+                             'type':'eq'
+                            },
+                            {'fun': lambda x : ord2disord_dist/2 - np.linalg.norm(x-corr_rnd),
+                             'type':'ineq'
+                            }
+                           ]
+        return self.constraints
+
     def get_constraints_phasediagram(self,FIXED_CORR_1):
 
         linear_constraints = self.set_linear_constraints()
@@ -87,7 +105,7 @@ class Constraints:
                            ]
         return self.constraints
 
-    def get_constraints_sro(self,FIXED_CORR_1,ch):
+    def get_constraints_hessian(self,FIXED_CORR_1,ch):
 
         if ch:
             linear_constraints = self.set_linear_constraints()
