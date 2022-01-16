@@ -5,7 +5,7 @@ import os
 import json
 from lmfit import Model, Parameters
 import numpy as np
-#import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 from energyfunctions import sro_T
 import warnings
 
@@ -46,7 +46,7 @@ if __name__ == '__main__':
                         default='sro_correction.out',
                         help="filename to store the result of the fit (default: %(default)s)",
                        )
-    parser.add_argument('--verbose', '-v', action='store_true', default=False,
+    parser.add_argument('--verbose', '-v', default=0,
                         help="Indicate the verbosity of the fit (default: %(default)s)",
                        )
     parser.add_argument('--show_warning',
@@ -60,16 +60,18 @@ if __name__ == '__main__':
         warnings.filterwarnings('ignore')
     degree = args.degree
     xdata, ydata = read_results(args.sro_correction)
-
     model = Model(sro_T)
     params = Parameters()
+
     for i in range(degree+1):
-        if i == 0:
-            params.add(f'coeff_{i}', value=1,vary=True)
-        elif i == degree:
-            params.add(f'exp_{i}',value=0.01, min=0, vary=True)
+
+        params.add(f'exp_{i}',value=0.01, min=0, vary=True)
+        if i == degree:
+            params.add(f'coeff_{i}', expr='-'+'-'.join(f'coeff_{i}' for i in range(degree)),
+                       value=1*(-1)**i,
+                       min=-5, max=5,
+                      )
         else:
-            params.add(f'exp_{i}',value=0.01, min=0, vary=True)
             params.add(f'coeff_{i}', value=1*(-1)**i, min=-5, max=5, vary=True)
     params.add('C',value=-0.01)
     params.add('degree',value=3, vary=False)
@@ -98,16 +100,16 @@ if __name__ == '__main__':
     
     with open(f'{args.out}','w') as fout:
         fout.write(results.fit_report())
-#    plt.style.use('seaborn-paper')
-#    fig = plt.figure(dpi=100, figsize=(5, 4),)
-#
-#    xr = np.linspace(0,int(max(xdata)),100)
-#    yr = model.eval(T=xr,**best_params)
-#    plt.plot(xdata, ydata, '.', label='data')
-#    plt.plot(xr,yr,label='fit')
-#    plt.xlabel('T')
-#    plt.ylabel(r'F$_{cvm}$ - F$_{disordered}$')
-#    plt.grid(True)
-#    plt.legend()
-#
-#    plt.savefig(f'{args.out}.svg')
+    plt.style.use('seaborn-paper')
+    fig = plt.figure(dpi=100, figsize=(5, 4),)
+
+    xr = np.linspace(0,int(max(xdata)),100)
+    yr = model.eval(T=xr,**best_params)
+    plt.plot(xdata, ydata, '.', label='data')
+    plt.plot(xr,yr,label='fit')
+    plt.xlabel('T')
+    plt.ylabel(r'F$_{cvm}$ - F$_{disordered}$')
+    plt.grid(True)
+    plt.legend()
+
+    plt.savefig(f'{args.out}.svg')
