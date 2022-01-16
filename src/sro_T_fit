@@ -1,0 +1,113 @@
+#!/usr/bin/env python3
+
+import argparse
+import os
+import json
+from lmfit import Model, Parameters
+import numpy as np
+#import matplotlib.pyplot as plt
+from energyfunctions import sro_T
+import warnings
+
+def read_results(fname):
+
+    try:
+        with open(fname,'r') as fhandle:
+            data = json.load(fhandle)
+    except Exception as e:
+        print(f'Error opening data file {fname}...')
+        exit(1)
+
+    xdata = np.array([item.get('temperature') for item in data])
+    ydata = np.array([item.get('F_cvm') - item.get('F_rnd') for item in data])
+
+    return xdata, ydata
+
+if __name__ == '__main__':
+
+    cwd = os.getcwd()
+    np.set_printoptions(suppress=True, precision=4)
+
+    parser = argparse.ArgumentParser(description='Fits SRO correction to a function in T')
+    parser.add_argument('--degree', '--deg',
+                        default='3',
+                        type=int,
+                        help="Maximum power of the fit (default: %(default)s)",
+                       )
+    parser.add_argument('--sro_correction',
+                        default='sro_correction.json',
+                        help="filename which contains the results of the CVM optimisation (default: %(default)s)",
+                       )
+    parser.add_argument('--method',
+                        default='least-squares',
+                        help="method of fitting a function on T to the SRO correction",
+                       )
+    parser.add_argument('--out',
+                        default='sro_correction.out',
+                        help="filename to store the result of the fit (default: %(default)s)",
+                       )
+    parser.add_argument('--verbose', '-v', action='store_true', default=False,
+                        help="Indicate the verbosity of the fit (default: %(default)s)",
+                       )
+    parser.add_argument('--show_warning',
+                        action='store_true',
+                        default=False,
+                        help="Enables to show warning (default: %(default)s)",
+                       )
+    args = parser.parse_args()
+
+    if not args.show_warning:
+        warnings.filterwarnings('ignore')
+    degree = args.degree
+    xdata, ydata = read_results(args.sro_correction)
+
+    model = Model(sro_T)
+    params = Parameters()
+    for i in range(degree+1):
+        if i == 0:
+            params.add(f'coeff_{i}', value=1,vary=True)
+        elif i == degree:
+            params.add(f'exp_{i}',value=0.01, min=0, vary=True)
+        else:
+            params.add(f'exp_{i}',value=0.01, min=0, vary=True)
+            params.add(f'coeff_{i}', value=1*(-1)**i, min=-5, max=5, vary=True)
+    params.add('C',value=-0.01)
+    params.add('degree',value=3, vary=False)
+
+    print('Preparing Parameters for fit...')
+    print(params.pretty_print())
+
+    print('Performing fit...')
+
+    try:
+        results = model.fit(ydata,
+                            params=params,
+                            T=xdata,
+                            method=args.method,
+                            verbose=args.verbose
+                           )
+    except Exception as e:
+        print('Error Fitting...')
+        exit(1)
+
+    print('Fitting Results:')
+    print(results.fit_report())
+    best_params = results.best_values
+
+    assert np.isclose(model.eval(T=np.inf,**best_params),0.0)
+    
+    with open(f'{args.out}','w') as fout:
+        fout.write(results.fit_report())
+#    plt.style.use('seaborn-paper')
+#    fig = plt.figure(dpi=100, figsize=(5, 4),)
+#
+#    xr = np.linspace(0,int(max(xdata)),100)
+#    yr = model.eval(T=xr,**best_params)
+#    plt.plot(xdata, ydata, '.', label='data')
+#    plt.plot(xr,yr,label='fit')
+#    plt.xlabel('T')
+#    plt.ylabel(r'F$_{cvm}$ - F$_{disordered}$')
+#    plt.grid(True)
+#    plt.legend()
+#
+#    plt.savefig(f'{args.out}.svg')

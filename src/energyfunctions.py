@@ -5,6 +5,21 @@ import math
 
 kB = 8.617330337217213e-05
 #kB=1
+
+def sro_T(T,**params):
+
+    r = 0
+    degree = params['degree']
+    for i in range(degree+1):
+        if i == 0:
+            r = r + params[f'coeff_{i}']
+        elif i == degree:
+            r = r - (np.sum([params[f'coeff_{j}'] for j in range(degree)])) * np.exp(-params[f'exp_{i}']/(kB*T))**degree
+        else:
+            r = r + params[f'coeff_{i}']*np.exp(-params[f'exp_{i}']/(kB*T))
+
+    return -np.abs(params['C'])*np.abs(r)
+
 def F(corrs, vmat, kb, clusters, configs, configcoef,T,eci):
     """
     Input: 
