@@ -82,7 +82,7 @@ if __name__ == '__main__':
                         help="Indicate the acceptable violation of constraints (default: %(default)s)",
                        )
     parser.add_argument('--global_trials',
-                        default=1,
+                        default=50,
                         type=int,
                         help="Indicate the number of initial point iteration for global minima search (default: %(default)s)",
                        )
@@ -110,8 +110,11 @@ if __name__ == '__main__':
     sys.stdout = Logger(sys.stdout, args.logfile, args.toscreen)
     if not args.show_warning:
         warnings.filterwarnings("ignore")
-    if args.ch:
-        print("Hessian is constrained to remain +ve definite")
+    if args.no_constraint:
+        print("Norm Constraint not allowed.")
+    else:
+        print("Norm Constraint activated...")
+
 
     results_sro = []
     path = Path(structure)
@@ -274,8 +277,6 @@ if __name__ == '__main__':
                          num_clusters=NUM_CLUSTERS,
                          NN=False,
                          corrs_trial=corr_rnd,
-                         ch=False,
-                         display_inter=False
                         )
 
     corr_ord = result_ord.x
@@ -355,19 +356,12 @@ if __name__ == '__main__':
                          num_clusters=NUM_CLUSTERS,
                          NN=False,
                          corrs_trial=corr_rnd,
-                         ch=args.ch
+                         display_inter=True
                         )
         F_cvm = result.fun
         print(f"Optimised CVM energy\t: {F_cvm:.4f}")
         print(f"Optimised Correlation\t: {result.x}")
-        hessian = F_hessian(result.x,clusters_full.vmat,
-                            clusters_full.kb,
-                            clusters_full.clusters,
-                            clusters_full.configs,
-                            clusters_full.configcoef,
-                            T,
-                            clusters_full.eci
-                           )
+        print("\n#################################################")
         F_solid_solution = F_sqs + F_cvm - F_rnd
         results_sro.append({'structure': structure.split('/')[-1],
                            'temperature': T,

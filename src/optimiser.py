@@ -26,22 +26,21 @@ def fit(F,
         num_clusters,
         NN,
         corrs_trial,
-        ch,
-        display_inter=True
+        display_inter=False
        ):
 
-    def sro_callback(xk,state):
-
-        hess_eigvals = np.real(eigvals(hess(xk,vmat, kb, clusters, configs, configcoef,temp,eci)))
-        with open(f"hessians-{int(ch)}-{datetime.now().strftime('%a')}-{datetime.now().strftime('%d')}",'a') as hess_file:
-            hess_file.write(np.array2string(hess_eigvals)+'\n')
-        try:
-            assert all(h >= 0 for h in hess_eigvals)
-        except AssertionError:
-            if ch:
-                print('VERY SERIOUS ERROR. Negative Hessian')
-            else:
-                print('WARNING: Negative Hessian')
+#    def sro_callback(xk,state):
+#
+#        hess_eigvals = np.real(eigvals(hess(xk,vmat, kb, clusters, configs, configcoef,temp,eci)))
+#        with open(f"hessians-{int(ch)}-{datetime.now().strftime('%a')}-{datetime.now().strftime('%d')}",'a') as hess_file:
+#            hess_file.write(np.array2string(hess_eigvals)+'\n')
+#        try:
+#            assert all(h >= 0 for h in hess_eigvals)
+#        except AssertionError:
+#            if ch:
+#                print('VERY SERIOUS ERROR. Negative Hessian')
+#            else:
+#                print('WARNING: Negative Hessian')
 
     MIN_RES = None
     MIN_RES_VAL = 1e5 #random large number
@@ -52,8 +51,6 @@ def fit(F,
 
     for _ in range(NUM_TRIALS):
 
-        if display_inter:
-            print(f'Trial Corrs {_}: {corrs_trial}')
         jitter = np.array([0, 0, *np.random.normal(0, .001, corrs_trial[2:].shape)])
         corrs_trial = corrs_trial+jitter
         temp_results = minimize(F,
@@ -65,7 +62,6 @@ def fit(F,
                                 hess=hess,
                                 constraints=constraints,
                                 bounds=bounds,
-#                                callback=sro_callback,
                                )
 
         if temp_results.fun < MIN_RES_VAL:
@@ -79,11 +75,11 @@ def fit(F,
                     print(f"Found new minimum for x:{FIXED_CORR_1:.4f}, T:{temp} fun: {MIN_RES_VAL}")
 
                 print(f'Current minimum correlations: {temp_results.x}')
-                hessian = hess(temp_results.x, vmat, kb, clusters,
-                                 configs, configcoef,temp, eci)
-                hess_eigvals = np.real(eigvals(hessian))
-                min_hess_eigval = np.amin(hess_eigvals)
-                print(f"Eigen Values of Hessian: {hess_eigvals}")
+                #hessian = hess(temp_results.x, vmat, kb, clusters,
+                #                 configs, configcoef,temp, eci)
+                #hess_eigvals = np.real(eigvals(hessian))
+                #min_hess_eigval = np.amin(hess_eigvals)
+                #print(f"Eigen Values of Hessian: {hess_eigvals}")
                 print(f"Gradient: {np.array2string(temp_results.grad)}")
                 print(f"Stop Status: {temp_results.status} | {temp_results.message}")
                 print('\n====================================\n')
