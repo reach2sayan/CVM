@@ -13,8 +13,6 @@ def sro_T(T,**params):
     for i in range(degree+1):
         if i == 0:
             r = r + params[f'coeff_{i}']
-        elif i == degree:
-            r = r - (np.sum([params[f'coeff_{j}'] for j in range(degree)])) * np.exp(-params[f'exp_{i}']/(kB*T))**degree
         else:
             r = r + params[f'coeff_{i}']*np.exp(-params[f'exp_{i}']/(kB*T))
 

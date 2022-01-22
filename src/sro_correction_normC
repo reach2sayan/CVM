@@ -5,6 +5,7 @@ Code Created By Sayan Samanta and Axel Van de Walle
 
 import argparse
 import os
+from pathlib import Path
 import sys
 import glob
 import warnings
@@ -21,24 +22,11 @@ from scipy.spatial.distance import cdist
 
 if __name__ == '__main__':
 
-    cwd = os.getcwd()
     np.set_printoptions(suppress=True, precision=4)
     np.random.seed(seed=42)
 
+    structure = os.getcwd()
     parser = argparse.ArgumentParser(description='CVM SRO Error Correction Code')
-    required = parser.add_argument_group('required arguments')
-    required.add_argument('--phase',
-                        required=True,
-                        help="name of phase for which correction is to be made",
-                       )
-    parser.add_argument('--ch',
-                          action='store_true',
-                          default=False,
-                          help="performs a inflection-detection optimisation to estimate disordered state at low T (default: %(default)s)"
-                         )
-#    parser.add_argument('--eci',
-#                        help="Skips the ECI fitting step and reads ECI from file",
-#                       )
     parser.add_argument('--clusters_fit',
                         default='clusters_fit.out',
                         help="contain the cluster description for fitting the ECIs (default: %(default)s)",
@@ -65,15 +53,16 @@ if __name__ == '__main__':
                         type=int,
                         help="Maximum T at which the SRO correction is to be made (default: %(default)s)"
                        )
-    parser.add_argument('--nTemp',
+    parser.add_argument('--Tstep',
                         default=100,
                         type=int,
                         help="Temperature increment steps in which the SRO correction is to be evaluated (default: %(default)s)"
                        )
-#    parser.add_argument('--out',
-#                        default=f'energy_sro_corrected',
-#                        help="Name of the file to output the SRO corrected energy. (default: %(default)s)"
-#                       )
+    parser.add_argument('--no_constraint',
+                        action='store_true',
+                        default=False,
+                        help="Flag to disable norm constraint (default: %(default)s)"
+                       )
     parser.add_argument('--verbose', '-v', action='count', default=0,
                         help="Indicate the verbosity of the fit (default: %(default)s)",
                        )
@@ -103,7 +92,7 @@ if __name__ == '__main__':
                         help="Enables to show warning (default: %(default)s)",
                        )
     parser.add_argument('--out',
-                        default=f'{cwd}/latest_result.json',
+                        default=f'latest_result.json',
                         help="Indicates the name of the output file (default: %(default)s)",
                        )
     parser.add_argument('--toscreen',
@@ -112,7 +101,7 @@ if __name__ == '__main__':
                         help="Enable logging to screen (default: %(default)s)",
                        )
     parser.add_argument('--logfile',
-                        default=f'{cwd}/log.out',
+                        default=f'log.out',
                         help="Filename for the log file (default: %(default)s)"
                        )
 
@@ -125,149 +114,221 @@ if __name__ == '__main__':
         print("Hessian is constrained to remain +ve definite")
 
     results_sro = []
+    path = Path(structure)
+    phase = str(path.parent.absolute())
 
-    #gather all structures that are not endmembers and have a valid energy
-    all_nonendmem_structures = []
+    print('\n============================')
+    print(f"Working on Structure: {structure.split('/')[-1]}")
 
-    for f in glob.glob(f'{cwd}/{args.phase}/sqs_*'):
-        if os.path.isfile(os.path.join(f,'endmem')):
-            continue
-        if os.path.isfile(os.path.join(f,'energy')) and os.path.getsize(os.path.join(f,'energy')) > 0:
-            all_nonendmem_structures.append(f)
-
-    for structure in all_nonendmem_structures:
-
-        print('\n============================')
-        print(f"Working on Structure: {structure.split('/')[-1]}")
-        print()
-
-        ref_structures = []
-        try:
-            with open(f'{structure}/{args.reference_file}','r') as ref_file:
-                for line in ref_file.readlines():
-                    ref_structures.append(line)
-        except FileNotFoundError:
-            print(f"No reference structure ({args.reference_file}) file. Assuming endmembers as reference.")
-            for f in glob.glob(f'{cwd}/{args.phase}/sqs_*'):
-                if os.path.isfile(os.path.join(f,'endmem')):
-                    ref_structures.append(f)
+    ref_structures = []
+    try:
+        with open(f'{structure}/{args.reference_file}','r') as ref_file:
+            for line in ref_file.readlines():
+                ref_structures.append(line)
+    except FileNotFoundError:
+        print(f"No reference structure ({args.reference_file}) file. Assuming endmembers as reference.")
+        for f in glob.glob(f'{phase}/sqs_*'):
+            if os.path.isfile(os.path.join(f,'endmem')):
+                ref_structures.append(f)
         
-        #Fit ECIs
-        energy = {}
-        corrs = {}
-        for struc in [*ref_structures,structure]: 
-            try:
-                with open(f'{struc}/energy','r') as energy_file:
-                    e = float(energy_file.readline())
-                    energy[struc] = e
-                    corr = subprocess.run(['corrdump','-c', f'-cf={cwd}/{args.phase}/{args.clusters_fit}', f'-s={struc}/str.in', f'-l={cwd}/{args.phase}/{args.l}'],
-                                          stdout=subprocess.PIPE,
-                                          stderr=subprocess.PIPE,
-                                          check=True
-                                         )
+    #Fit ECIs
+    energy = {}
+    corrs = {}
+    for struc in [*ref_structures,structure]: 
+        try:
+            with open(f'{struc}/energy','r') as energy_file:
+                e = float(energy_file.readline())
+                energy[struc] = e
+                corr = subprocess.run(['corrdump','-c', f'-cf={phase}/{args.clusters_fit}', f'-s={struc}/str.in', f'-l={phase}/{args.l}'],
+                                      stdout=subprocess.PIPE,
+                                      stderr=subprocess.PIPE,
+                                      check=True
+                                     )
 
-                    corr = corr.stdout.decode('utf-8').split('\t')[:-1] #convert from bytes to string list
-                    corr = np.array(corr, dtype=np.float32) #convert to arrays
-                    corrs[struc] = corr
-            except FileNotFoundError:
-                print('Energy File (probably of the reference structure) not found.')
+                corr = corr.stdout.decode('utf-8').split('\t')[:-1] #convert from bytes to string list
+                corr = np.array(corr, dtype=np.float32) #convert to arrays
+                corrs[struc] = corr
+        except FileNotFoundError:
+            print('Energy File (probably of the reference structure) not found.')
 
-        clusters_fit = ClusterInfo.read_clusters(f'{cwd}/{args.phase}/{args.clusters_fit}')
-        NUM_CLUSTERS = len(clusters_fit)
-        """
-        We are doing Ax = b
-        where A = mult_corr
-        and B = energy_fits
-        """
+    clusters_fit = ClusterInfo.read_clusters(f'{phase}/{args.clusters_fit}')
+    NUM_CLUSTERS = len(clusters_fit)
+    """
+    We are doing Ax = b
+    where A = mult_corr
+    and B = energy_fits
+    """
 
-        mult = np.array([cluster['mult'] for cluster in clusters_fit.values()])
-        only_corr = np.array([corr for _ , corr in corrs.items()])
-        energy_fits = np.array([e for _, e in energy.items()])
-        mult_corr = np.array([corr*mult for corr in only_corr])
-        print("Fitting ECI's...")
-        ecis_fitted = np.linalg.solve(mult_corr, energy_fits)
-        print(f"ECI's : {ecis_fitted}") 
+    mult = np.array([cluster['mult'] for cluster in clusters_fit.values()])
+    only_corr = np.array([corr for _ , corr in corrs.items()])
+    energy_fits = np.array([e for _, e in energy.items()])
+    mult_corr = np.array([corr*mult for corr in only_corr])
+    print("Fitting ECI's...")
+    ecis_fitted = np.linalg.solve(mult_corr, energy_fits)
+    print(f"ECI's : {ecis_fitted}") 
 
-        #Make new ECI file
-        TOT_ECI = len(ClusterInfo.read_clusters(f'{cwd}/{args.phase}/clusters.out'))
-        ecis = np.array([*ecis_fitted, *([0]*(TOT_ECI - len(ecis_fitted)))])
-        with open(f'{structure}/eci.out','w') as eci_file:
-            eci_file.write(f'{TOT_ECI}\n')
-            for eci in ecis:
-                eci_file.write(f'{eci}\n')
+    #Make new ECI file
+    TOT_ECI = len(ClusterInfo.read_clusters(f'{phase}/clusters.out'))
+    ecis = np.array([*ecis_fitted, *([0]*(TOT_ECI - len(ecis_fitted)))])
+    with open(f'{structure}/eci.out','w') as eci_file:
+        eci_file.write(f'{TOT_ECI}\n')
+        for eci in ecis:
+            eci_file.write(f'{eci}\n')
 
-        #Generate Full Cluster Description
-        clusters_full = subprocess.run(['cvmclus', f'-m={cwd}/{args.phase}/{args.maxclus}', f'-l={cwd}/{args.phase}/{args.l}'],
-                                       stdout=subprocess.PIPE,
-                                       stderr=subprocess.PIPE,
-                                       cwd=f'{cwd}/{args.phase}/',
-                                       check=True
-                                      )
-        clusters_full = ClusterInfo(f'{cwd}/{args.phase}/clusters.out',
-                            f'{cwd}/{args.phase}/kb.out',
-                            f'{cwd}/{args.phase}/configcoef.out',
-                            f'{cwd}/{args.phase}/config.out',
-                            f'{cwd}/{args.phase}/vmat.out',
-                            f'{structure}/eci.out',
-                           )
-        NUM_CLUSTERS = len(clusters_full.clusters)
+    #Generate Full Cluster Description
+    clusters_full = subprocess.run(['cvmclus', f'-m={phase}/{args.maxclus}', f'-l={phase}/{args.l}'],
+                                   stdout=subprocess.PIPE,
+                                   stderr=subprocess.PIPE,
+                                   cwd=f'{phase}/',
+                                   check=True
+                                  )
+    clusters_full = ClusterInfo(f'{phase}/clusters.out',
+                        f'{phase}/kb.out',
+                        f'{phase}/configcoef.out',
+                        f'{phase}/config.out',
+                        f'{phase}/vmat.out',
+                        f'{structure}/eci.out',
+                       )
+    NUM_CLUSTERS = len(clusters_full.clusters)
 
-        #Check if the fit is done properly
-        full_corrs = {}
-        for struc in [*ref_structures,structure]:
-            corr = subprocess.run(['corrdump','-c', f'-cf={cwd}/{args.phase}/clusters.out', f'-s={struc}/str.in', f'-l={cwd}/{args.phase}/{args.l}'],
-                                  stdout=subprocess.PIPE,
-                                  stderr=subprocess.PIPE,
-                                  check=True
-                                 )
-            corr = corr.stdout.decode('utf-8').split('\t')[:-1] #convert from bytes to string list
-            corr = np.array(corr, dtype=np.float32) #convert to arrays
-            full_corrs[structure] = corr
+    #Check if the fit is done properly
+    full_corrs = {}
+    for struc in [*ref_structures,structure]:
+        corr = subprocess.run(['corrdump','-c', f'-cf={phase}/clusters.out', f'-s={struc}/str.in', f'-l={phase}/{args.l}'],
+                              stdout=subprocess.PIPE,
+                              stderr=subprocess.PIPE,
+                              check=True
+                             )
+        corr = corr.stdout.decode('utf-8').split('\t')[:-1] #convert from bytes to string list
+        corr = np.array(corr, dtype=np.float32) #convert to arrays
+        full_corrs[structure] = corr
 
-        for s, full_corr in full_corrs.items():
-            test_E1 = F(full_corr,
-                        clusters_full.vmat,
-                        clusters_full.kb,
-                        clusters_full.clusters,
-                        clusters_full.configs,
-                        clusters_full.configcoef,
-                        0,
-                        clusters_full.eci)
+    for s, full_corr in full_corrs.items():
+        test_E1 = F(full_corr,
+                    clusters_full.vmat,
+                    clusters_full.kb,
+                    clusters_full.clusters,
+                    clusters_full.configs,
+                    clusters_full.configcoef,
+                    0,
+                    clusters_full.eci)
 
-            with open(f'{s}/energy','r') as f:
-                for line in f.readlines():
-                    test_E2 = float(line)
-            assert np.isclose(test_E1, test_E2)
-
-        with open(f'{structure}/energy','r') as f:
+        with open(f'{s}/energy','r') as f:
             for line in f.readlines():
-                F_sqs = float(line)
-                print(f"Read in SQS energy\t: {F_sqs:.4f}")
+                test_E2 = float(line)
+        assert np.isclose(test_E1, test_E2)
 
-        corr_rnd = subprocess.run(['corrdump','-c', f'-cf={cwd}/{args.phase}/clusters.out', f'-s={structure}/str.in', f'-l={cwd}/{args.phase}/{args.l}','-rnd'],
-                                  stdout=subprocess.PIPE,
-                                  stderr=subprocess.PIPE
-                                 )
-        corr_rnd = corr_rnd.stdout.decode('utf-8').split('\t')[:-1] #convert from bytes to string list
-        corr_rnd = np.array(corr_rnd, dtype=np.float32) #convert to arrays
-        assert corr_rnd[0] == 1
-        assert clusters_full.check_result_validity(corr_rnd)
+    with open(f'{structure}/energy','r') as f:
+        for line in f.readlines():
+            F_sqs = float(line)
+            print(f"Read in SQS energy\t: {F_sqs:.4f}")
 
-        #find ordered correlation
-        FIXED_CORR_1_ORD = corr_rnd[1]
+    corr_rnd = subprocess.run(['corrdump','-c', f'-cf={phase}/clusters.out', f'-s={structure}/str.in', f'-l={phase}/{args.l}','-rnd'],
+                              stdout=subprocess.PIPE,
+                              stderr=subprocess.PIPE
+                             )
+    corr_rnd = corr_rnd.stdout.decode('utf-8').split('\t')[:-1] #convert from bytes to string list
+    corr_rnd = np.array(corr_rnd, dtype=np.float32) #convert to arrays
+    assert corr_rnd[0] == 1
+    assert clusters_full.check_result_validity(corr_rnd)
+
+    #find ordered correlation
+    FIXED_CORR_1_ORD = corr_rnd[1]
+
+    constraints = Constraints(clusters_full.vmat,
+                              clusters_full.kb,
+                              clusters_full.clusters,
+                              clusters_full.configs,
+                              clusters_full.configcoef,
+                              0,
+                              clusters_full.eci
+                             )
+    bounds = CorrBounds(NUM_CLUSTERS)
+
+    constraints_ord = constraints.get_constraints_phasediagram(FIXED_CORR_1_ORD)
+    bounds_ord = bounds.get_pd_bounds(FIXED_CORR_1_ORD)
+
+    options = {'verbose' : args.verbose,
+               'maxiter' : args.maxiter,
+               'xtol'    : args.xtol,
+               'gtol'    : args.gtol,
+               'initial_constr_penalty' : 10
+              }
+
+    print('Calculating Ordered Correlation....')
+    result_ord = opt.fit(F=S,
+                         vmat=clusters_full.vmat, kb=clusters_full.kb,
+                         clusters=clusters_full.clusters,
+                         configs=clusters_full.configs,
+                         configcoef=clusters_full.configcoef,
+                         eci=clusters_full.eci,
+                         temp=0,
+                         options=options,
+                         jac=S_jacobian,
+                         hess=S_hessian,
+                         NUM_TRIALS=20,
+                         FIXED_CORR_1=FIXED_CORR_1_ORD,
+                         FIXED_CORR_2=None,
+                         bounds=bounds_ord,
+                         constraints=constraints_ord,
+                         num_clusters=NUM_CLUSTERS,
+                         NN=False,
+                         corrs_trial=corr_rnd,
+                         ch=False,
+                         display_inter=False
+                        )
+
+    corr_ord = result_ord.x
+    print(f"Ordered correlation\t: {corr_ord}")
+
+    ord2disord_dist = np.linalg.norm(corr_ord - corr_rnd)
+    print(f"L2 norm between the fully disordered and ordered state:\t {ord2disord_dist}")
+    print('\n========================================\n')
+    print('Starting T optimisation...norm constraint enabled..\n')
+    def custom_linspace(start,stop,step=1):
+        """
+        Like np.linspace but uses step instead of num
+        This is inclusive to stop, so if start=1, stop=3, step=0.5
+        Output is: array([1., 1.5, 2., 2.5, 3.])
+        """
+
+        return np.linspace(start, stop, int((stop - start) / step + 1))
+
+
+    for T in custom_linspace(start=args.Tmin,
+                             stop=args.Tmax,
+                             step=args.Tstep):
+
+        print(f'\nOptimising at temperature {T} K') 
+
+        F_rnd = F(corr_rnd,
+                  clusters_full.vmat,
+                  clusters_full.kb,
+                  clusters_full.clusters,
+                  clusters_full.configs,
+                  clusters_full.configcoef,
+                  T,
+                  clusters_full.eci)
+        print(f"Disordered CVM energy\t: {F_rnd:.4f}")
+        print(f"Disordered Correlations\t: {corr_rnd}")
+
+        FIXED_CORR_1 = corr_rnd[1]
 
         constraints = Constraints(clusters_full.vmat,
                                   clusters_full.kb,
                                   clusters_full.clusters,
                                   clusters_full.configs,
                                   clusters_full.configcoef,
-                                  0,
+                                  T,
                                   clusters_full.eci
                                  )
         bounds = CorrBounds(NUM_CLUSTERS)
 
-        constraints_ord = constraints.get_constraints_phasediagram(FIXED_CORR_1_ORD)
-        bounds_ord = bounds.get_pd_bounds(FIXED_CORR_1_ORD)
+        if args.no_constraint:
+            constraints_sro = constraints.get_constraints_sro(FIXED_CORR_1, ord2disord_dist, corr_rnd)
+        else:
+            constraints_sro = constraints.get_constraints_phasediagram(FIXED_CORR_1,)
+        bounds_sro = bounds.get_pd_bounds(FIXED_CORR_1)
 
         options = {'verbose' : args.verbose,
                    'maxiter' : args.maxiter,
@@ -276,135 +337,51 @@ if __name__ == '__main__':
                    'initial_constr_penalty' : 10
                   }
 
-        print('Calculating Ordered Correlation....')
-        result_ord = opt.fit(F=S,
-                             vmat=clusters_full.vmat, kb=clusters_full.kb,
-                             clusters=clusters_full.clusters,
-                             configs=clusters_full.configs,
-                             configcoef=clusters_full.configcoef,
-                             eci=clusters_full.eci,
-                             temp=0,
-                             options=options,
-                             jac=S_jacobian,
-                             hess=S_hessian,
-                             NUM_TRIALS=20,
-                             FIXED_CORR_1=FIXED_CORR_1_ORD,
-                             FIXED_CORR_2=None,
-                             bounds=bounds_ord,
-                             constraints=constraints_ord,
-                             num_clusters=NUM_CLUSTERS,
-                             NN=False,
-                             corrs_trial=corr_rnd,
-                             ch=False,
-                             display_inter=False
-                            )
+        result = opt.fit(F=F,
+                         vmat=clusters_full.vmat, kb=clusters_full.kb,
+                         clusters=clusters_full.clusters,
+                         configs=clusters_full.configs,
+                         configcoef=clusters_full.configcoef,
+                         eci=clusters_full.eci,
+                         temp=T,
+                         options=options,
+                         jac=F_jacobian,
+                         hess=F_hessian,
+                         NUM_TRIALS=args.global_trials,
+                         FIXED_CORR_1=FIXED_CORR_1,
+                         FIXED_CORR_2=None,
+                         bounds=bounds_sro,
+                         constraints=constraints_sro,
+                         num_clusters=NUM_CLUSTERS,
+                         NN=False,
+                         corrs_trial=corr_rnd,
+                         ch=args.ch
+                        )
+        F_cvm = result.fun
+        print(f"Optimised CVM energy\t: {F_cvm:.4f}")
+        print(f"Optimised Correlation\t: {result.x}")
+        hessian = F_hessian(result.x,clusters_full.vmat,
+                            clusters_full.kb,
+                            clusters_full.clusters,
+                            clusters_full.configs,
+                            clusters_full.configcoef,
+                            T,
+                            clusters_full.eci
+                           )
+        F_solid_solution = F_sqs + F_cvm - F_rnd
+        results_sro.append({'structure': structure.split('/')[-1],
+                           'temperature': T,
+                           'corrs': list(result.x),
+                           'F_sqs': F_sqs,
+                           'F_rnd': F_rnd,
+                           'F_cvm': F_cvm
+                           }
+                          )
 
-        corr_ord = result_ord.x
-        print(f"Ordered correlation\t: {corr_ord}")
+        corrcols = [f'corr {i}' for i in range(NUM_CLUSTERS)]
+        for item in results_sro:
+            for idx, corrnum in enumerate(corrcols):
+                item[f'{corrnum}'] = item['corrs'][idx]
 
-        ord2disord_dist = np.linalg.norm(corr_ord - corr_rnd)
-        print(f"L2 norm between the fully disordered and ordered state:\t {ord2disord_dist}")
-        print('\n========================================\n')
-        print('Starting T optimisation...norm constraint enabled..\n')
-        def custom_linspace(start,stop,step=1):
-            """
-            Like np.linspace but uses step instead of num
-            This is inclusive to stop, so if start=1, stop=3, step=0.5
-            Output is: array([1., 1.5, 2., 2.5, 3.])
-            """
-
-            return np.linspace(start, stop, int((stop - start) / step + 1))
-
-
-        for T in custom_linspace(start=args.Tmin,
-                                 stop=args.Tmax,
-                                 step=args.nTemp):
-
-            print(f'\nOptimising at temperature {T} K') 
-
-            F_rnd = F(corr_rnd,
-                      clusters_full.vmat,
-                      clusters_full.kb,
-                      clusters_full.clusters,
-                      clusters_full.configs,
-                      clusters_full.configcoef,
-                      T,
-                      clusters_full.eci)
-            print(f"Disordered CVM energy\t: {F_rnd:.4f}")
-            print(f"Disordered Correlations\t: {corr_rnd}")
-
-            FIXED_CORR_1 = corr_rnd[1]
-
-            constraints = Constraints(clusters_full.vmat,
-                                      clusters_full.kb,
-                                      clusters_full.clusters,
-                                      clusters_full.configs,
-                                      clusters_full.configcoef,
-                                      T,
-                                      clusters_full.eci
-                                     )
-            bounds = CorrBounds(NUM_CLUSTERS)
-
-            constraints_sro = constraints.get_constraints_sro(FIXED_CORR_1,ord2disord_dist,corr_rnd)
-            bounds_sro = bounds.get_pd_bounds(FIXED_CORR_1)
-
-            options = {'verbose' : args.verbose,
-                       'maxiter' : args.maxiter,
-                       'xtol'    : args.xtol,
-                       'gtol'    : args.gtol,
-                       'initial_constr_penalty' : 10
-                      }
-
-            result = opt.fit(F=F,
-                             vmat=clusters_full.vmat, kb=clusters_full.kb,
-                             clusters=clusters_full.clusters,
-                             configs=clusters_full.configs,
-                             configcoef=clusters_full.configcoef,
-                             eci=clusters_full.eci,
-                             temp=T,
-                             options=options,
-                             jac=F_jacobian,
-                             hess=F_hessian,
-                             NUM_TRIALS=args.global_trials,
-                             FIXED_CORR_1=FIXED_CORR_1,
-                             FIXED_CORR_2=None,
-                             bounds=bounds_sro,
-                             constraints=constraints_sro,
-                             num_clusters=NUM_CLUSTERS,
-                             NN=False,
-                             corrs_trial=corr_rnd,
-                             ch=args.ch
-                            )
-            F_cvm = result.fun
-            print(f"Optimised CVM energy\t: {F_cvm:.4f}")
-            print(f"Optimised Correlation\t: {result.x}")
-            hessian = F_hessian(result.x,clusters_full.vmat,
-                                clusters_full.kb,
-                                clusters_full.clusters,
-                                clusters_full.configs,
-                                clusters_full.configcoef,
-                                T,
-                                clusters_full.eci
-                               )
-            #print(f"Hessian of CVM optimised {structure.split('/')[-1]} :\n {hessian}")
-            #print(f"Eigen values of Optimised: {np.linalg.eigvals(hessian)}") 
-            F_solid_solution = F_sqs + F_cvm - F_rnd
-            results_sro.append({'structure': structure.split('/')[-1],
-                               'temperature': T,
-                               'corrs': list(result.x),
-                               'F_sqs': F_sqs,
-                               'F_rnd': F_rnd,
-                               'F_cvm': F_cvm
-                               }
-                              )
-
-            corrcols = [f'corr {i}' for i in range(NUM_CLUSTERS)]
-            for item in results_sro:
-                for idx, corrnum in enumerate(corrcols):
-                    item[f'{corrnum}'] = item['corrs'][idx]
-
-            with open(args.out,'w') as fout:
-                json.dump(results_sro, fout)
-            #print(f"SRO Corrected Energy \t: {F_solid_solution:.4f}")
-            #with open(f'{structure}/{args.out}','w') as f:
-            #    f.write(f'{F_solid_solution}')
+        with open(args.out,'w') as fout:
+            json.dump(results_sro, fout)
