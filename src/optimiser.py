@@ -3,136 +3,80 @@ Optimiser module for SRO Correction
 """
 
 import numpy as np
-from datetime import datetime
-from scipy.linalg import eigvals
 from scipy.optimize import minimize
 from scipy.optimize import BFGS
-from valid_corr_generator import get_valid_corrs
+
 
 def fit(F,
-        vmat, kb,
-        clusters,
-        configs, configcoef,
+        cluster_data,
         temp,
-        eci,
         options,
         jac,
         hess,
         NUM_TRIALS,
-        FIXED_CORR_1,
-        FIXED_CORR_2,
         bounds,
         constraints,
-        num_clusters,
-        NN,
         corrs_trial,
-        display_inter=False
-       ):
+        display_inter=False,
+        approx_deriv=True,
+        init_random=False,
+        init_disordered=True
+        ):
+    """
+    Functions takes in all required inputs :
+        1. Functions and derivatives (if available),
+        2. tolerances,
+        3. bounds and constraints,
+        4. Other fitting parameters
+    and returns the minimised set of values for the particular section of the CVM correction pipeline.
+    """
 
-#    def sro_callback(xk,state):
-#
-#        hess_eigvals = np.real(eigvals(hess(xk,vmat, kb, clusters, configs, configcoef,temp,eci)))
-#        with open(f"hessians-{int(ch)}-{datetime.now().strftime('%a')}-{datetime.now().strftime('%d')}",'a') as hess_file:
-#            hess_file.write(np.array2string(hess_eigvals)+'\n')
-#        try:
-#            assert all(h >= 0 for h in hess_eigvals)
-#        except AssertionError:
-#            if ch:
-#                print('VERY SERIOUS ERROR. Negative Hessian')
-#            else:
-#                print('WARNING: Negative Hessian')
-
-    MIN_RES = None
-    MIN_RES_VAL = 1e5 #random large number
-    if NN:
-        corrs0 = np.array([1, FIXED_CORR_1, FIXED_CORR_2, *np.random.uniform(-1,1,num_clusters-3)])
-    else:
-        corrs0 = get_valid_corrs(FIXED_CORR_1,None,vmat,clusters,num_clusters)
+    result = None
+    result_value = 1e5
+    if approx_deriv:
+        jac = '3-point'
+        hess = BFGS()
 
     for _ in range(NUM_TRIALS):
+        if init_random:
+            corrs_attempt = np.array([1, *[corrs_trial[1]]*len(cluster_data.single_point_clusters),
+                                      *np.random.uniform(-1, 1, cluster_data.num_clusters - len(cluster_data.single_point_clusters) - 1)
+                                      ]
+                                     )
+        elif init_disordered:
+            jitter = np.array([0,
+                               *[0]*len(cluster_data.single_point_clusters),
+                               *np.random.normal(0, .001, cluster_data.num_clusters - len(cluster_data.single_point_clusters) - 1)
+                               ]
+                              )
+            corrs_attempt = corrs_trial+jitter
 
-        jitter = np.array([0, 0, *np.random.normal(0, .001, corrs_trial[2:].shape)])
-        corrs_trial = corrs_trial+jitter
+        print(f'{_} : {corrs_attempt}',)
         temp_results = minimize(F,
-                                corrs_trial,
+                                corrs_attempt,
                                 method='trust-constr',
-                                args=(vmat, kb, clusters, configs, configcoef,temp,eci),
+                                args=(cluster_data.vmat,
+                                      cluster_data.kb,
+                                      cluster_data.clusters,
+                                      cluster_data.configcoef,
+                                      temp,
+                                      cluster_data.eci),
                                 options=options,
                                 jac=jac,
                                 hess=hess,
                                 constraints=constraints,
                                 bounds=bounds,
-                               )
+                                )
 
-        if temp_results.fun < MIN_RES_VAL:
-            MIN_RES = temp_results
-            MIN_RES_VAL = temp_results.fun
+        if temp_results.fun < result_value:
+            result = temp_results
+            result_value = temp_results.fun
             if display_inter:
-                if NN:
-                    print('\n')
-                    print(f"Found new minimum for Corr1:{FIXED_CORR_1:.4f}, Corr2:{FIXED_CORR_2:.4f} fun: {MIN_RES_VAL:.15f}")
-                else:
-                    print(f"Found new minimum for x:{FIXED_CORR_1:.4f}, T:{temp} fun: {MIN_RES_VAL}")
-
+                print(f'Current Energy: {temp_results.fun}')
                 print(f'Current minimum correlations: {temp_results.x}')
-                #hessian = hess(temp_results.x, vmat, kb, clusters,
-                #                 configs, configcoef,temp, eci)
-                #hess_eigvals = np.real(eigvals(hessian))
-                #min_hess_eigval = np.amin(hess_eigvals)
-                #print(f"Eigen Values of Hessian: {hess_eigvals}")
                 print(f"Gradient: {np.array2string(temp_results.grad)}")
-                print(f"Stop Status: {temp_results.status} | {temp_results.message}")
+                print(
+                    f"Stop Status: {temp_results.status} | {temp_results.message}")
                 print('\n====================================\n')
 
-    return MIN_RES
-
-#def mufit(F,
-#          vmat, kb, 
-#          clusters, 
-#          configs, configcoef,
-#          temp, 
-#          eci, 
-#          options,
-#          jac,
-#          hess,
-#          NUM_TRIALS,
-#          bounds,
-#          constraints,
-#          num_clusters,
-#          mu,
-#         ):
-#
-#    random.seed(42)
-#
-#    MIN_RES = None 
-#    MIN_RES_VAL = 1e5 #random large number
-#    for _ in range(NUM_TRIALS):
-#
-#        print(_,end='\r')
-#
-#        corrs0 = np.array([1,*np.random.uniform(-1,1,num_clusters-1)])
-#        temp_results = minimize(F,
-#                                corrs0,
-#                                method='trust-constr',
-#                                args=(vmat, kb, clusters, configs, configcoef,temp,eci,mu),
-#                                options=options,
-#                                jac=jac,
-#                                hess=hess,
-#                                constraints=constraints,
-#                                bounds=bounds
-#                               )
-#
-#        if temp_results.fun < MIN_RES_VAL:
-#            MIN_RES = temp_results
-#            MIN_RES_VAL = temp_results.fun
-#
-#            print(f"Found new minimum for Mu :{mu}, fun: {MIN_RES_VAL:.15f}")
-#            print(f'Current minimum correlations: {temp_results.x}')
-#            print("Rhos:")
-#            for val in temp_results.constr[:num_clusters]:
-#                print(np.array2string(val))
-#            print(f"Gradient: {np.array2string(temp_results.grad)}")
-#            print(f"Stop Status: {temp_results.status} | {temp_results.message}")
-#            print('\n====================================\n')
-#
-#    return MIN_RES
+    return result
