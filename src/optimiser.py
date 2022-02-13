@@ -20,7 +20,8 @@ def fit(F,
         display_inter=False,
         approx_deriv=True,
         init_random=False,
-        init_disordered=True
+        init_disordered=True,
+        seed=42
         ):
     """
     Functions takes in all required inputs :
@@ -30,7 +31,7 @@ def fit(F,
         4. Other fitting parameters
     and returns the minimised set of values for the particular section of the CVM correction pipeline.
     """
-
+    rng = np.random.default_rng(seed)
     result = None
     result_value = 1e5
     if approx_deriv:
@@ -40,13 +41,13 @@ def fit(F,
     for _ in range(NUM_TRIALS):
         if init_random:
             corrs_attempt = np.array([1, *[corrs_trial[1]]*len(cluster_data.single_point_clusters),
-                                      *np.random.uniform(-1, 1, cluster_data.num_clusters - len(cluster_data.single_point_clusters) - 1)
+                                      *rng.uniform(-1, 1, cluster_data.num_clusters - len(cluster_data.single_point_clusters) - 1)
                                       ]
                                      )
         elif init_disordered:
             jitter = np.array([0,
                                *[0]*len(cluster_data.single_point_clusters),
-                               *np.random.normal(0, .001, cluster_data.num_clusters - len(cluster_data.single_point_clusters) - 1)
+                               *rng.normal(0, .001, cluster_data.num_clusters - len(cluster_data.single_point_clusters) - 1)
                                ]
                               )
             corrs_attempt = corrs_trial+jitter

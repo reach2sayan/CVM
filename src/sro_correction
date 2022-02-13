@@ -16,12 +16,10 @@ import optimiser as opt
 from constraints import Constraints
 from bounds import CorrBounds
 from energyfunctions import H, H_jacobian, F, F_jacobian, F_hessian
-from fit_eci import fit_eci
+from fit_eci import fit_eci_scipy, fit_eci_lsfit
 from clusterdata import ClusterInfo
 from logger import Logger
 from create_cvm_structures import create_structure
-
-rng = np.random.default_rng()
 
 def custom_linspace(start, stop, step=1):
     """
@@ -36,7 +34,6 @@ def custom_linspace(start, stop, step=1):
 if __name__ == '__main__':
 
     np.set_printoptions(suppress=True, precision=4)
-    np.random.seed(seed=42)
 
     structure = os.getcwd()
     path = Path(structure)
@@ -52,6 +49,11 @@ if __name__ == '__main__':
         "Parameters related to fitting SRO as a function of temperature")
     clus_params = parser.add_argument_group("Parameters related to CVM")
 
+    parser.add_argument('--seed',
+                        default=42,
+                        type=float,
+                        help='set numpy random seed (for reproducible experiments)'
+                       )
     clus_fit_params.add_argument('--clusters_fit',
                                  default='clusters_fit.out',
                                  help="contain the cluster description for fitting the ECIs ",
@@ -68,10 +70,6 @@ if __name__ == '__main__':
                                  action='store_true',
                                  default=False,
                                  help="Skips the ECI fitting step.",
-                                 )
-    clus_fit_params.add_argument('--eci_init',
-                                 default='eci_init.in',
-                                 help="file containing eci init values",
                                  )
     clus_fit_params.add_argument('--make_substructures_only',
                                  action='store_true',
@@ -92,11 +90,11 @@ if __name__ == '__main__':
                              help="file contain the maximal cluster description ",
                              )
     clus_params.add_argument('--kb',
-                             default='kb.out',
+                             default='configkb.out',
                              help="file containing the kikuchi-barker coefficients ",
                              )
     clus_params.add_argument('--configcoef',
-                             default='configcoef.out',
+                             default='configmult.out',
                              help="file containing coefficient for each subcluster ",
                              )
     clus_params.add_argument('--config',
@@ -166,30 +164,30 @@ if __name__ == '__main__':
                             default=False,
                             help="Enable logging to screen ",
                             )
-    opt_params.add_argument('--logfile',
+    opt_params.add_argument('--log',
                             default='log.out',
                             help="Filename for the log file "
                             )
 
+
     args = parser.parse_args()
 
-    sys.stdout = Logger(sys.stdout, args.logfile, args.toscreen)
+    sys.stdout = Logger(sys.stdout, args.log, args.toscreen)
     if not args.show_warning:
         warnings.filterwarnings("ignore")
 
     if args.make_substructures_only:
 
-        clfit = ClusterInfo(clusters_fname=f'{structure}/clusters_fit.out',
-                            eci_fname=f'{structure}/eci_init.out',
+        clfit = ClusterInfo(clusters_fname=f'{phase}/clusters_fit.out',
                             cluster_only=True
                            )
         print(
             f'Found {clfit.num_clusters} no. of clusters to fit. Creating as many structures...')
         ref_list = open('references.in', 'w')
-        ref_list.write(f'{cwd}')
+        ref_list.write(f'{structure}')
         for label in range(clfit.num_clusters*2):
             create_structure(label)
-            ref_list.write(f'{cwd}/{label}\n')
+            ref_list.write(f'{structure}/{label}\n')
             ref_list.close()
 
         sys.exit('Created substructures. Now exiting')
@@ -201,7 +199,7 @@ if __name__ == '__main__':
 
     # Generate Full Cluster Description
     try:
-        clusters_full = subprocess.run(['cvmclus', f'-m={structure}/{args.maximal_clusters}', f'-l={structure}/{args.lat}'],
+        clusters_full = subprocess.run(['cvmclus', f'-m={phase}/{args.maximal_clusters}', f'-l={structure}/{args.lat}'],
                                        stdout=subprocess.PIPE,
                                        stderr=subprocess.PIPE,
                                        check=True
@@ -226,7 +224,7 @@ if __name__ == '__main__':
     else:
         print('\n===================================================\n')
         print(
-            f'Fitting ECIs. Starting parameters taken from {args.eci_init}\n')
+            'Fitting ECIs.\n')
         energies = {}
         correlations = {}
         try:
@@ -239,7 +237,7 @@ if __name__ == '__main__':
             sys.exit(1)
 
         clusters_fit = ClusterInfo(
-            args.clusters_fit, args.eci_init, None, None, None, None, cluster_only=True)
+            args.clusters_fit, None, None, None, None, None, cluster_only=True)
 
         for struc in reference_structures:
             try:
@@ -265,7 +263,8 @@ if __name__ == '__main__':
                 print(
                     f'Energy of reference structure {struc} not found. Probably some error in DFT calc')
 
-        eci_tmp = fit_eci(clusters_fit, correlations, energies)
+        #eci_tmp = fit_eci_scipy(clusters_fit, correlations, energies, structure)
+        eci_tmp = fit_eci_lsfit(clusters_fit, correlations, energies,structure)
 
         eci_tmp = np.array(
             [*eci_tmp, *np.zeros(clusters_full.num_clusters - clusters_fit.num_clusters)])
@@ -332,7 +331,8 @@ if __name__ == '__main__':
                              corrs_trial=corr_rnd,
                              approx_deriv=True,
                              display_inter=True,
-                             init_random=True
+                             init_random=True,
+                             seed=args.seed
                              )
 
         corr_ord = result_ord.x
@@ -385,7 +385,8 @@ if __name__ == '__main__':
                          bounds=bounds_sro,
                          constraints=constraints_sro,
                          corrs_trial=corr_rnd,
-                         display_inter=True
+                         display_inter=True,
+                         seed=args.seed
                          )
         F_cvm = result.fun
         print(f"Optimised CVM energy\t: {F_cvm:.4f}")
@@ -408,3 +409,7 @@ if __name__ == '__main__':
 
         with open(args.out, 'w') as fout:
             json.dump(results_sro, fout)
+    
+    #Now fit the result to a function of T
+
+

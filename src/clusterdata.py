@@ -25,7 +25,7 @@ class ClusterInfo:
     """
 
     def __init__(self, clusters_fname,
-                 eci_fname,
+                 eci_fname=None,
                  kb_fname=None,
                  configcoef_fname=None,
                  config_fname=None,
@@ -34,31 +34,33 @@ class ClusterInfo:
 
         try:
             if cluster_only:
-                print('Creating an Object with cluster and ECI only. Not suitable for CVM.')
+                print(
+                    'Creating an Object with cluster and ECI only. Not suitable for CVM.')
                 self.clusters = ClusterInfo.read_clusters(clusters_fname)
                 self.kb = None
                 self.configcoef = None
                 self.configs = None
                 self.vmat = None
-                self.eci = ClusterInfo.read_eci(eci_fname)
+                self.eci = {idx: 0.0 for idx in self.clusters}
             else:
                 self.clusters = ClusterInfo.read_clusters(clusters_fname)
                 self.kb = ClusterInfo.read_kbcoeffs(kb_fname)
                 self.configcoef = ClusterInfo.read_configcoef(configcoef_fname)
                 self.configs = ClusterInfo.read_configs(config_fname)
                 self.vmat = ClusterInfo.read_vmatrix(vmat_fname)
-                self.eci = ClusterInfo.read_eci(eci_fname)
+                self.eci = ClusterInfo.read_eci(eci_fname, len(self.clusters))
         except FileNotFoundError as fnfe:
             print('File Not Found for instanting cluster description. Exiting...')
             print(fnfe)
             sys.exit(1)
 
-        try:
-            assert len(self.eci) == len(self.clusters)
-        except AssertionError:
-            print(
-                f'Number of ECIs ({len(self.eci)}) does not match number of clusters ({len(self.clusters)}). Exiting...')
-            sys.exit(1)
+#        if not cluster_only:
+#            try:
+#                assert len(self.eci) == len(self.clusters)
+#            except AssertionError:
+#                print(
+#                    f'Number of ECIs ({len(self.eci)}) does not match number of clusters ({len(self.clusters)}). Exiting...')
+#                sys.exit(1)
 
     def get_rho(self, corrs):
 
@@ -193,20 +195,27 @@ class ClusterInfo:
         return vmat
 
     @classmethod
-    def read_eci(cls, eci_fname):
+    def read_eci(cls, eci_fname, numclus):
 
         # Read eci
         eci = {}
+        try:
+            with open(eci_fname, 'r') as feci:
+                _ = next(feci)  # Ignore first line
+                temp_eci = feci.read()
+                temp_eci = temp_eci.split('\n')  # split by line
 
-        with open(eci_fname, 'r') as feci:
-            _ = next(feci)  # Ignore first line
-            temp_eci = feci.read()
-            temp_eci = temp_eci.split('\n')  # split by line
+            print(f'Reading ECIs from {eci_fname}')
+            for idx, eci_val in enumerate(temp_eci):
+                if eci_val == '':
+                    continue
+                eci[idx] = float(eci_val)
+        except FileNotFoundError:
+            temp_eci = np.array([0]*numclus)
 
-        for idx, eci_val in enumerate(temp_eci):
-            if eci_val == '':
-                continue
-            eci[idx] = float(eci_val)
+            for idx, eci_val in enumerate(temp_eci):
+                eci[idx] = eci_val
+            return eci
 
         return eci
 
