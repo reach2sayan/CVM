@@ -110,9 +110,12 @@ class ClusterInfo:
 
         clusters = {}
 
-        with open(clusters_fname, 'r') as fclusters:
-            # Read blocks separated by 1 empty line
-            temp_clusters = fclusters.read().split('\n\n')
+        try:
+            with open(clusters_fname, 'r') as fclusters:
+                # Read blocks separated by 1 empty line
+                temp_clusters = fclusters.read().split('\n\n')
+        except FileNotFoundError as fnfe:
+            sys.exit(f"CLuster description file {clusters_fname.split('/')[-1]} not found. Exiting...")
 
         for idx, cluster in enumerate(temp_clusters):
             if cluster == '':
@@ -132,18 +135,21 @@ class ClusterInfo:
     def read_kbcoeffs(cls, kb_fname):
 
         kb = {}
-        fkb = open(kb_fname, 'r')
-        _ = next(fkb)  # ignore first line
+        try:
+            fkb = open(kb_fname, 'r')
+            _ = next(fkb)  # ignore first line
 
-        temp_kb = fkb.read()
+            temp_kb = fkb.read()
+            fkb.close()
+        except FileNotFoundError as fnfe:
+            sys.exit(f"Kikuchi-Barker coefficients file {kb_fname.split('/')[-1]} not found. Exiting...")
+
         temp_kb = temp_kb.split('\n')  # split file linewise
-
         for idx, kbcoeff in enumerate(temp_kb):
             if kbcoeff == '':  # check for spurious empty blocks
                 continue
             kb[idx] = float(kbcoeff)
 
-        fkb.close()
         return kb
 
     @classmethod
@@ -153,11 +159,14 @@ class ClusterInfo:
         pattern1 = re.compile("\n\n\n")
         pattern2 = re.compile("\n\n")
 
-        with open(configcoef_fname, 'r') as fsubmult:
-            _ = next(fsubmult)  # ignore first line
-            temp_submult = fsubmult.read()
-            # split lines into blocks separated by 2 empty lines
-            temp_submult = pattern2.split(temp_submult)
+        try:
+            with open(configcoef_fname, 'r') as fsubmult:
+                _ = next(fsubmult)  # ignore first line
+                temp_submult = fsubmult.read()
+                # split lines into blocks separated by 2 empty lines
+                temp_submult = pattern2.split(temp_submult)
+        except FileNotFoundError as fnfe:
+            sys.exit(f"Config Multiplicities file {configcoef_fname.split('/')[-1]} not found. Exiting...")
 
         for idx, submult in enumerate(temp_submult[:-1]):
             submult = submult.split('\n')  # split into number of subclusters
@@ -175,22 +184,26 @@ class ClusterInfo:
         pattern2 = re.compile("\n\n")
 
         vmat = {}
-        with open(vmat_fname, 'r') as fvmat:
-            _ = next(fvmat)  # ignore first lie
-            temp_vmat = fvmat.read()
-            # split by 2 empty lines i.e. maxclusters
-            temp_vmat = pattern2.split(temp_vmat)
+        try:
+            with open(vmat_fname, 'r') as fvmat:
+                _ = next(fvmat)  # ignore first lie
+                temp_vmat = fvmat.read()
+        except FileNotFoundError as fnfe:
+            sys.exit(f"Vmat file {vmat_fname.split('/')[-1]} not found. Exiting...")
 
-            while("" in temp_vmat):
-                temp_vmat.remove("")  # remove empty blocks
+        # split by 2 empty lines i.e. maxclusters
+        temp_vmat = pattern2.split(temp_vmat)
 
-            for clus_idx, mat in enumerate(temp_vmat):
-                mat = mat.split('\n')  # split by 1 empty line i.e. subclusters
-                mat_float = np.empty(list(map(int, mat[0].split(' '))))
-                for idx, row in enumerate(mat[1:]):  # ignore first line
-                    mat_float[idx] = list(map(float, row.split(' ')[:-1]))
+        while("" in temp_vmat):
+            temp_vmat.remove("")  # remove empty blocks
 
-                vmat[clus_idx] = mat_float
+        for clus_idx, mat in enumerate(temp_vmat):
+            mat = mat.split('\n')  # split by 1 empty line i.e. subclusters
+            mat_float = np.empty(list(map(int, mat[0].split(' '))))
+            for idx, row in enumerate(mat[1:]):  # ignore first line
+                mat_float[idx] = list(map(float, row.split(' ')[:-1]))
+
+            vmat[clus_idx] = mat_float
 
         return vmat
 
@@ -205,12 +218,13 @@ class ClusterInfo:
                 temp_eci = feci.read()
                 temp_eci = temp_eci.split('\n')  # split by line
 
-            print(f'Reading ECIs from {eci_fname}')
+            print(f"Reading ECIs from existing file {eci_fname.split('/')[-1]}.")
             for idx, eci_val in enumerate(temp_eci):
                 if eci_val == '':
                     continue
                 eci[idx] = float(eci_val)
         except FileNotFoundError:
+            print(f"No pre-existing {eci_fname.split('/')[-1]} file found. Instantiating with all zeros")
             temp_eci = np.array([0]*numclus)
 
             for idx, eci_val in enumerate(temp_eci):
@@ -227,10 +241,14 @@ class ClusterInfo:
         # Read config.out
         configs = {}
 
-        fconfig = open(config_fname, 'r')
-        _ = next(fconfig)  # Ignore first line
+        try:
+            fconfig = open(config_fname, 'r')
+            _ = next(fconfig)  # Ignore first line
 
-        temp_config = fconfig.read()  # .split('\n\n')
+            temp_config = fconfig.read()  # .split('\n\n')
+        except FileNotFoundError as fnfe:
+            print(f"Config Description file {config_fname.split('/')[-1]} not found. Since this is not explicitly used in calculation. The programs shall continue.")
+            return None
         # split lines separated by 2 empty lines
         temp_config = pattern1.split(temp_config)
 

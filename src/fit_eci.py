@@ -34,17 +34,17 @@ def fit_eci_scipy(clusters_fit, correlations, energies, structure):
         print(f'Issues with fitting ECI: {ae}')
 
     fitted_energies = mults_corrs @ eci_fit
-    plt.plot(energies_array, energies_array, 'X',
-             label='Ab-initio Energies')
-    plt.plot(energies_array, fitted_energies,
-             'd', label='Fitted Energies')
-    plt.xlabel('Energies Calculated (in eV)')
-    plt.ylabel('Energies Fitted (in eV)')
-    plt.title('ECI Fit Results')
-    plt.legend()
-    print(f'Energies FP: {energies_array}\nEnergies Fitted: {fitted_energies}')
-    plt.tight_layout()
-    plt.savefig('eci_fit_results_scipy.svg', dpi=300)
+#    plt.plot(energies_array, energies_array, 'X',
+#             label='Ab-initio Energies')
+#    plt.plot(energies_array, fitted_energies,
+#             'd', label='Fitted Energies')
+#    plt.xlabel('Energies Calculated (in eV)')
+#    plt.ylabel('Energies Fitted (in eV)')
+#    plt.title('ECI Fit Results')
+#    plt.legend()
+#    print(f'Energies FP: {energies_array}\nEnergies Fitted: {fitted_energies}')
+#    plt.tight_layout()
+#    plt.savefig('eci_fit_results_scipy.svg', dpi=300)
 
     return eci_fit
 
@@ -74,16 +74,16 @@ def fit_eci_lsfit(clusters_fit, correlations, energies, structure):
     eci_fit = np.fromstring(eci_fit.stdout.decode('utf-8'),sep='\n')
 
     fitted_energies = mults_corrs @ eci_fit
-    plt.plot(energies_array, energies_array, 'X',
-             label='Ab-initio Energies')
-    plt.plot(energies_array, fitted_energies,
-             'd', label='Fitted Energies')
-    plt.xlabel('Energies Calculated (in eV)')
-    plt.ylabel('Energies Fitted (in eV)')
-    plt.title('ECI Fit Results')
-    plt.legend()
-    print(f'Energies FP: {energies_array}\nEnergies Fitted: {fitted_energies}')
-    plt.tight_layout()
-    plt.savefig('eci_fit_results_lsfit.svg', dpi=300)
+#    plt.plot(energies_array, energies_array, 'X',
+#             label='Ab-initio Energies')
+#    plt.plot(energies_array, fitted_energies,
+#             'd', label='Fitted Energies')
+#    plt.xlabel('Energies Calculated (in eV)')
+#    plt.ylabel('Energies Fitted (in eV)')
+#    plt.title('ECI Fit Results')
+#    plt.legend()
+#    print(f'Energies FP: {energies_array}\nEnergies Fitted: {fitted_energies}')
+#    plt.tight_layout()
+#    plt.savefig('eci_fit_results_lsfit.svg', dpi=300)
 
     return eci_fit
