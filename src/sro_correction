@@ -6,32 +6,34 @@ Code Created By Sayan Samanta and Axel Van de Walle
 import argparse
 import os
 from pathlib import Path
-from typing import Final
 import sys
 import warnings
 import json
 import subprocess
+
 import numpy as np
+
 import optimiser as opt
 from constraints import Constraints
 from bounds import CorrBounds
-from energyfunctions import H, H_jacobian, F, F_jacobian, F_hessian
+from energyfunctions import H, H_jacobian, F, F_jacobian, F_hessian, sro_T
 from fit_eci import fit_eci_scipy, fit_eci_lsfit
 from clusterdata import ClusterInfo
 from logger import Logger
 from create_cvm_structures import create_structure
-
-def custom_linspace(start, stop, step=1):
-    """
-    Like np.linspace but uses step instead of num
-    This is inclusive to stop, so if start=1, stop=3, step=0.5
-    Output is: array([1., 1.5, 2., 2.5, 3.])
-    """
-
-    return np.linspace(start, stop, int((stop - start) / step + 1))
+from sro_T_fit import sro_T_fit
 
 
 if __name__ == '__main__':
+
+    def custom_linspace(start, stop, step=1):
+        """
+        Like np.linspace but uses step instead of num
+        This is inclusive to stop, so if start=1, stop=3, step=0.5
+        Output is: array([1., 1.5, 2., 2.5, 3.])
+        """
+
+        return np.linspace(start, stop, int((stop - start) / step + 1))
 
     np.set_printoptions(suppress=True, precision=4)
 
@@ -53,7 +55,7 @@ if __name__ == '__main__':
                         default=42,
                         type=float,
                         help='set numpy random seed (for reproducible experiments)'
-                       )
+                        )
     clus_fit_params.add_argument('--clusters_fit',
                                  default='clusters_fit.out',
                                  help="contain the cluster description for fitting the ECIs ",
@@ -71,11 +73,11 @@ if __name__ == '__main__':
                                  default=False,
                                  help="Skips the ECI fitting step.",
                                  )
-    clus_fit_params.add_argument('--make_substructures_only',
+    clus_fit_params.add_argument('--make_substructures_only', '-ms',
                                  action='store_true',
                                  default=False,
                                  help="Reads cluster description for fitting to create permuted structures and exists",
-                                )
+                                 )
 
     clus_params.add_argument('--eci',
                              default='eci.out',
@@ -120,6 +122,38 @@ if __name__ == '__main__':
                                 default=100,
                                 type=int,
                                 help="Temperature increment steps in which the SRO correction is to be evaluated "
+                                )
+    sro_fit_params.add_argument('--degree', '--deg',
+                                default='3',
+                                type=int,
+                                help="Maximum power of the fit ",
+                                )
+    sro_fit_params.add_argument('--method',
+                                default='least-squares',
+                                help="method of fitting a function on T to the SRO correction",
+                                )
+    sro_fit_params.add_argument('--coeff_out',
+                                default='sro_coeffs.out',
+                                help="filename to store the result of the fit ",
+                                )
+    sro_fit_params.add_argument('--coeff_in',
+                                default='sro_coeffs.in',
+                                help="filename to store the initial params of the fit ",
+                                )
+    sro_fit_params.add_argument('--skip_expo',
+                                action='store_true',
+                                default=False,
+                                help="Flag to skip fitting exponents ",
+                                )
+    sro_fit_params.add_argument('--skip_sro_fit',
+                                action='store_true',
+                                default=False,
+                                help="Flag to skip fitting SRO correction as a function of T",
+                                )
+    sro_fit_params.add_argument('--fit_sro_only',
+                                action='store_true',
+                                default=False,
+                                help="Flag to optimisation but only fit SRO correction as a function of",
                                 )
 
     opt_params.add_argument('--no_constraint',
@@ -169,33 +203,55 @@ if __name__ == '__main__':
                             help="Filename for the log file "
                             )
 
-
     args = parser.parse_args()
+
+    # This part of the code only makes the subdirectories on which the user to run DFT.
+    # To generate data for ECI fitting
+    if args.make_substructures_only:
+        print('Flag to create substructures only found.')
+        clfit = ClusterInfo(clusters_fname=f'{structure}/clusters_fit.out',
+                            cluster_only=True
+                            )
+        print(
+            f'Found {clfit.num_clusters} no. of clusters to fit. Creating double as many structures...')
+        ref_list = open('references.in', 'w')
+        ref_list.write('./')
+        for label in range(clfit.num_clusters*2):
+            create_structure(label)
+            ref_list.write(f'./{label}\n')
+        ref_list.close()
+
+        sys.exit('Created substructures. Now exiting')
+    # End of substructure making only.
+    ###
+
+    # This part of the code only fits the SRO correction vs T part.
+    # This section is repeated at the very end because I didn't want to write another wrapper for 20 lines of code.
+    if args.fit_sro_only:
+        print('Flag to fit SRO as a function of T only found. Skipping all optimisation Steps.')
+        best_params = sro_T_fit(sro_T,
+                                args.degree,
+                                args.out,
+                                args.coeff_in,
+                                args.skip_expo,
+                                args.method,
+                                args.verbose
+                                )
+
+        with open(f'{args.coeff_out}', 'w') as fout:
+            for d in range(args.degree+1):
+                c = best_params[f'coeff_{d}']
+                e = best_params[f'exp_{d}']
+                fout.write(f'{c},{e}\n')
+            bestC = best_params['C']
+            fout.write(f'{bestC},0')
+        sys.exit(1)
+    # End of SRO correction fitting to T only
+    ###
 
     sys.stdout = Logger(sys.stdout, args.log, args.toscreen)
     if not args.show_warning:
         warnings.filterwarnings("ignore")
-
-    if args.make_substructures_only:
-
-        clfit = ClusterInfo(clusters_fname=f'{phase}/clusters_fit.out',
-                            cluster_only=True
-                           )
-        print(
-            f'Found {clfit.num_clusters} no. of clusters to fit. Creating as many structures...')
-        ref_list = open('references.in', 'w')
-        ref_list.write(f'{structure}')
-        for label in range(clfit.num_clusters*2):
-            create_structure(label)
-            ref_list.write(f'{structure}/{label}\n')
-            ref_list.close()
-
-        sys.exit('Created substructures. Now exiting')
-
-    if args.no_constraint:
-        print("Norm Constraint not activated.")
-    else:
-        print("Norm Constraint activated...")
 
     # Generate Full Cluster Description
     try:
@@ -219,6 +275,8 @@ if __name__ == '__main__':
                                 cluster_only=False
                                 )
 
+    # This section of the code either chooses to skip fitting ECIs
+    # Or go ahead, read from substructures to do the ECI fit
     if args.skip_eci_fitting:
         print(f"Skipping ECI fitting step. Using {args.eci} instead")
     else:
@@ -264,7 +322,8 @@ if __name__ == '__main__':
                     f'Energy of reference structure {struc} not found. Probably some error in DFT calc')
 
         #eci_tmp = fit_eci_scipy(clusters_fit, correlations, energies, structure)
-        eci_tmp = fit_eci_lsfit(clusters_fit, correlations, energies,structure)
+        eci_tmp = fit_eci_lsfit(
+            clusters_fit, correlations, energies, structure)
 
         eci_tmp = np.array(
             [*eci_tmp, *np.zeros(clusters_full.num_clusters - clusters_fit.num_clusters)])
@@ -282,9 +341,10 @@ if __name__ == '__main__':
 
         for eci, cluster_idx in zip(eci_tmp, clusters_full.clusters.keys()):
             clusters_full.eci[cluster_idx] = eci
+    # End ECI fitting
+    ###
 
     results_sro = []
-
     with open(f'{structure}/energy_atom', 'r') as f:
         for line in f.readlines():
             F_sqs = float(line)
@@ -301,13 +361,15 @@ if __name__ == '__main__':
     assert corr_rnd[0] == 1
     assert clusters_full.check_result_validity(corr_rnd)
 
-    FIXED_CORRS: Final = corr_rnd[clusters_full.single_point_clusters]
+    FIXED_CORRS = corr_rnd[clusters_full.single_point_clusters]
     constraints = Constraints(clusters_full)
     bounds = CorrBounds(clusters_full.num_clusters, len(
         clusters_full.single_point_clusters))
 
-    # find ordered correlation
+    # This part of the code find the ordered correlation given the current ECI
+    # Is skipped if no norm constraint if requried
     if not args.no_constraint:
+        print("Norm Constraint activated...\n")
         constraints_ord = constraints.get_constraints_ordered(corr_rnd)
         bounds_ord = bounds.get_sro_bounds(FIXED_CORRS)
 
@@ -343,7 +405,10 @@ if __name__ == '__main__':
         print('\n========================================\n')
         print('Starting T optimisation...\n')
     else:
+        print("Norm Constraint not activated.\n")
         print('Starting T optimisation...\n')
+    # End of the calcualting ordered correlations
+    ###
 
     for T in custom_linspace(start=args.Tmin, stop=args.Tmax, step=args.Tstep):
 
@@ -356,8 +421,8 @@ if __name__ == '__main__':
                   clusters_full.configcoef,
                   T,
                   clusters_full.eci)
-        print(f"Disordered CVM energy\t: {F_rnd:.4f}")
-        print(f"Disordered Correlations\t: {corr_rnd}")
+        print(f"Disordered CVM energy @ T = {T}K\t: {F_rnd:.4f}")
+        print(f"Disordered Correlations @ T = {T}K\t: {corr_rnd}")
 
         if not args.no_constraint:
             constraints_sro = constraints.get_constraints_sro(
@@ -389,8 +454,8 @@ if __name__ == '__main__':
                          seed=args.seed
                          )
         F_cvm = result.fun
-        print(f"Optimised CVM energy\t: {F_cvm:.4f}")
-        print(f"Optimised Correlation\t: {result.x}")
+        print(f"Optimised CVM energy @ T = {T}K\t: {F_cvm:.4f}")
+        print(f"Optimised Correlation @ T = {T}K\t: {result.x}")
         print("\n#################################################")
         F_solid_solution = F_sqs + F_cvm - F_rnd
         results_sro.append({'structure': structure.split('/')[-1],
@@ -409,7 +474,28 @@ if __name__ == '__main__':
 
         with open(args.out, 'w') as fout:
             json.dump(results_sro, fout)
-    
-    #Now fit the result to a function of T
 
+    print('Finished Optimising for SRO correction')
 
+    # This section has the same code as above. But does the fit following a full optimisation
+    ###
+    if not args.skip_sro:
+        print('Fitting SRO corrections to a function of T')
+        best_params = sro_T_fit(sro_T,
+                                args.degree,
+                                args.out,
+                                args.coeff_in,
+                                args.skip_expo,
+                                args.method,
+                                args.verbose
+                                )
+
+        with open(f'{args.coeff_out}', 'w') as fout:
+            for d in range(args.degree+1):
+                c = best_params[f'coeff_{d}']
+                e = best_params[f'exp_{d}']
+                fout.write(f'{c},{e}\n')
+            bestC = best_params['C']
+            fout.write(f'{bestC},0')
+    else:
+        print('Flag to skip SRO correction fitting as a function of T.')

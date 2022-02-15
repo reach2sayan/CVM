@@ -1,75 +1,44 @@
 #!/usr/bin/python3
-
-from subprocess import Popen, PIPE
-from pathlib import Path
 import os
-import numpy as np
-import ase.io
-from clusterdata import ClusterInfo
-
-rng = np.random.default_rng()
-
+import random
 
 def create_structure(label):
+    """
+    Module to create a subdirectory named <label>
+    The str.in and str.out files from the parent structure is taken
+    and any two unlike atoms are swapped to create new structures
+    that are close to the ordered structure.
+    This is done to create datapoints to fit ECIs for a local clusters expansion
+    on this structure
+    """
 
     cwd = os.getcwd()
     os.makedirs(os.path.join(cwd, str(label)), exist_ok=True)
 
     for structure in ['str.in', 'str.out']:
+        cell = []
+        positions = []
+        with open(f'{cwd}/{structure}', 'r') as f:
+            for line in f.readlines():
+                if len(line.rstrip().split(' ')) == 4:
+                    positions.append(line.rstrip().split(' '))
+                else:
+                    cell.append(line.rstrip())
 
-        # convert str.out and str.in to POSCAR
-        with open(f'{cwd}/{structure}', 'r') as frelax:
-            relax_str = frelax.read()
+            while True:
+                rnd_index1 = random.randint(0, len(positions)-1)
+                rnd_index2 = random.randint(0, len(positions)-1)
 
-        p = Popen(['str2poscar'], stdout=PIPE, stdin=PIPE)
-        p.stdin.write(str.encode(relax_str))
-        poscar = p.communicate()[0].decode('utf-8')
+                if positions[rnd_index1][3] != positions[rnd_index2][3]:
+                    tmp = positions[rnd_index1][3]
+                    positions[rnd_index1][3] = positions[rnd_index2][3]
+                    positions[rnd_index2][3] = tmp
+                    break
 
-        with open(f'{cwd}/{structure}.POSCAR', 'w') as fposcar:
-            fposcar.write(poscar)
-
-        # read tmp.POSCAR to ase atoms for creating other structures
-        atoms = ase.io.read(f'{cwd}/{structure}.POSCAR')
-
-        elems = atoms.get_chemical_symbols()
-        rng.shuffle(elems)
-        atoms.set_chemical_symbols(elems)
-
-        ase.io.write(
-            f'{cwd}/{label}/{structure}_shuffled.POSCAR', atoms, sort=True)
-
-        # convert to str.out
-        p = Popen(['str2poscar', '-r'], stdout=PIPE, stdin=PIPE)
-        with open(f'{cwd}/{label}/{structure}_shuffled.POSCAR', 'r') as fout:
-            out_str = fout.read()
-
-        p.stdin.write(str.encode(out_str))
-        out = p.communicate()[0].decode('utf-8')
-        with open(f'{cwd}/{label}/{structure}', 'w') as fout:
-            fout.write(out)
-
-        with open(f'{cwd}/{label}/wait', 'w') as fwait:
-            pass
-
-    print(f'Created Structure {label}.')
-    return
-
-
-if __name__ == '__main__':
-
-    cwd = os.getcwd()
-    path = Path(cwd)
-    phase = path.parent.absolute()
-
-    clfit = ClusterInfo(clusters_fname=f'{phase}/clusters_fit.out',
-                        eci_fname=f'{phase}/eci.out',
-                        cluster_only=True
-                        )
-    print(
-        f'Found {clfit.num_clusters} no. of clusters to fit. Creating as many structures...')
-    ref_list = open('references.in', 'w')
-    ref_list.write(f'{cwd}')
-    for label in range(clfit.num_clusters*2):
-        create_structure(label)
-        ref_list.write(f'{cwd}/{label}\n')
-    ref_list.close()
+            with open(f'{cwd}/{label}/{structure}', 'w') as flabel:
+                for line in cell:
+                    flabel.write(line+'\n')
+                for line in positions:
+                    flabel.write(" ".join(line)+'\n')
+            with open(f'{cwd}/{label}/wait','w'):
+                pass
