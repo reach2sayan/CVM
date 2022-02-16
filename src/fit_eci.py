@@ -1,4 +1,3 @@
-#!/usr/bin/python3
 import subprocess
 import numpy as np
 from scipy.linalg import lstsq, LinAlgError

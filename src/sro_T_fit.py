@@ -1,37 +1,46 @@
-#!/usr/bin/env python3
-
+"""
+Module containing code to fit ECI
+"""
 import sys
 import json
 from lmfit import Model, Parameters
 import numpy as np
 
-def read_results(fname):
 
+def read_results(fname):
+    """
+    Parses the json file to extract relevanle arrays to fit
+    """
     try:
         with open(fname, 'r') as fhandle:
             data = json.load(fhandle)
-    except Exception as e:
-        print(f'Error opening data file {fname}...')
-        exit(1)
+    except FileNotFoundError as e:
+        sys.exit(f"Data file {fname.split('/')[-1]} not found...")
 
     xdata = np.array([item.get('temperature') for item in data])
     ydata = np.array([item.get('F_cvm') - item.get('F_rnd') for item in data])
 
     return xdata, ydata
 
+
 def read_coeffs(fname, degree):
+    """
+    Reads the initial coefficient from file.
+    Creates default is file not found
+    """
 
     trial = []
     try:
         with open(fname, 'r') as handle:
             data = handle.readlines()
-        for idx, d in enumerate(range(degree+1)):
+        for idx, _ in enumerate(range(degree+1)):
             tmp = data[idx].strip().split(',')
             trial.append([float(tmp[0]), float(tmp[-1])])
         trial.append([0.01, 0])
         return np.array(trial)
-    except FileNotFoundError as e:
-        print(f"File {fname.split('/')[-1]} not found. Initialising with defaults")
+    except FileNotFoundError:
+        print(
+            f"File {fname.split('/')[-1]} not found. Initialising with defaults")
         for d in range(degree+1):
             if d == 0:
                 trial.append([1, 0])
@@ -40,8 +49,21 @@ def read_coeffs(fname, degree):
         trial.append([0.01, 0])
         return np.array(trial)
 
-def sro_T_fit(func, degree, results_file, coeff_in, skip_expo, method, verbose):
 
+def sro_T_fit(func, degree, results_file, coeff_in, skip_expo, method, verbose):
+    """
+    Function to perform the fit
+    Input:
+        func - function to fit to
+        degree - max degree of the polynomial
+        results_file - file to read optimised data from
+        coeff_in - Initial guess for the parameters
+        skip_expo - Flag to have a constant exponential terms across all powers
+        method - default Least-Squares minimization, using Trust Region Reflective method
+        verbose- verbosity
+    Output:
+        Best fit parameter values
+    """
     xdata, ydata = read_results(results_file)
     model = Model(func)
     params = Parameters()
@@ -92,13 +114,13 @@ def sro_T_fit(func, degree, results_file, coeff_in, skip_expo, method, verbose):
     try:
         assert np.isclose(model.eval(T=np.inf, **results.best_values), 0.0)
     except AssertionError:
-        sys.exit('WARNING. The fitted function does not go to zero as T tends to infinity...')
+        sys.exit(
+            'WARNING. The fitted function does not go to zero as T tends to infinity...')
 
     print('Fitting Results:')
     print(results.fit_report())
 
     return results.best_values
-
 
     # plt.style.use('seaborn-paper')
     #fig = plt.figure(dpi=100, figsize=(5, 4),)
