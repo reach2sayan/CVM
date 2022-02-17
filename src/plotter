@@ -1,0 +1,66 @@
+#!/usr/bin/python3
+
+import sys
+import matplotlib.pyplot as plt
+import numpy as np
+
+from sro_T_fit import read_results
+
+plt.style.use('default')
+
+
+def plot_eci_fit(energy_file='ref_energies.in',
+                 corr_file='ref_correlations.in',
+                 eci_file='eci.out',
+                 img_name='plot_ecifit.png'
+                 ):
+    try:
+        e = np.loadtxt(energy_file)
+        mc = np.loadtxt(corr_file)
+        eci = np.loadtxt(eci_file)
+        eci = np.delete(eci, range(mc.shape[1], eci.shape[0]))
+    except FileNotFoundError:
+        sys.exit('Processed data not found. Run a fit to generate one, or provie one')
+
+    pred_e = mc @ eci
+    np.set_printoptions(precision=3, suppress=True)
+    plt.plot(e, e, '*', label='Calculated values')
+    plt.plot(e, pred_e, 'd', label='Predicted values')
+    plt.xlabel('Energy (in eV)')
+    plt.ylabel('Energy (in eV)')
+    plt.legend()
+    plt.grid(True)
+    plt.suptitle('ECI Fit')
+    plt.tight_layout()
+    plt.savefig(img_name, dpi=300)
+
+
+def plot_sro_fit(xdata_file='x_sro.dat',
+                 ydata_file='y_sro.dat',
+                 xpred_file='x_sro_fit.dat',
+                 ypred_file='y_sro_fit.dat',
+                 img_name='sro_fit.png'
+                 ):
+    try:
+        xdata = np.loadtxt(xdata_file)
+        ydata = np.loadtxt(ydata_file)
+        xr = np.loadtxt(xpred_file)
+        yr = np.loadtxt(ypred_file)
+    except FileNotFoundError:
+        sys.exit(
+            'Preprocessed data files not found. Perhaps a fit was not performed.')
+
+    plt.plot(xdata, ydata, '.', label='data')
+    plt.plot(xr, yr, label='fit')
+    plt.xlabel('T')
+    plt.ylabel(r'F$_{cvm}$ - F$_{disordered}$')
+    plt.grid(True)
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(img_name, dpi=300)
+
+
+if __name__ == '__main__':
+
+    #plot_eci_fit()
+    plot_sro_fit()

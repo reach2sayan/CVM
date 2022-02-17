@@ -119,19 +119,11 @@ def sro_T_fit(func, degree, results_file, coeff_in, skip_expo, method, verbose):
 
     print('Fitting Results:')
     print(results.fit_report())
+    xr = np.linspace(0, int(max(xdata)), 100)
+    yr = model.eval(T=xr, **results.best_values)
+    np.savetxt('x_sro.dat', xdata)
+    np.savetxt('y_sro.dat', ydata)
+    np.savetxt('x_sro_fit.dat', xr)
+    np.savetxt('y_sro_fit.dat', yr)
 
     return results.best_values
-
-    # plt.style.use('seaborn-paper')
-    #fig = plt.figure(dpi=100, figsize=(5, 4),)
-
-    #xr = np.linspace(0,int(max(xdata)),100)
-    #yr = model.eval(T=xr,**best_params)
-    #plt.plot(xdata, ydata, '.', label='data')
-    # plt.plot(xr,yr,label='fit')
-    # plt.xlabel('T')
-    #plt.ylabel(r'F$_{cvm}$ - F$_{disordered}$')
-    # plt.grid(True)
-    # plt.legend()
-
-    # plt.savefig(f'{args.out}.svg')
