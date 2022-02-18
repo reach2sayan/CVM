@@ -18,6 +18,7 @@ def plot_eci_fit(energy_file='ref_energies.in',
         e = np.loadtxt(energy_file)
         mc = np.loadtxt(corr_file)
         eci = np.loadtxt(eci_file)
+        eci = np.delete(eci, 0)
         eci = np.delete(eci, range(mc.shape[1], eci.shape[0]))
     except FileNotFoundError:
         sys.exit('Processed data not found. Run a fit to generate one, or provie one')
@@ -62,5 +63,7 @@ def plot_sro_fit(xdata_file='x_sro.dat',
 
 if __name__ == '__main__':
 
-    #plot_eci_fit()
-    plot_sro_fit()
+    if sys.argv[1] == 'eci':
+        plot_eci_fit()
+    elif sys.argv[1] == 'sro':
+        plot_sro_fit()

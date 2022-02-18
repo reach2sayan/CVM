@@ -68,6 +68,11 @@ if __name__ == '__main__':
                                  default='maxclus.in',
                                  help="constains he name of the maximal cluster file",
                                  )
+    clus_fit_params.add_argument('--fit_eci_only',
+                                 action='store_true',
+                                 default=False,
+                                 help="Flag to only fit ECI and exit.",
+                                 )
     clus_fit_params.add_argument('--skip_eci_fitting',
                                  action='store_true',
                                  default=False,
@@ -78,6 +83,16 @@ if __name__ == '__main__':
                                  default=False,
                                  help="Reads cluster description for fitting to create permuted structures and exists",
                                  )
+    clus_fit_params.add_argument('--percent_shuffle', '-ps',
+                                 type=float,
+                                 default=0.25,
+                                 help="how many times to shuffle labels to create structures for ECI fit",
+                                )
+    clus_fit_params.add_argument('--mult_substructures', '-ps',
+                                 type=float,
+                                 default=2,
+                                 help="how many substructures to make as a multiple of number of ECI to fit",
+                                )
 
     clus_params.add_argument('--eci',
                              default='eci.out',
@@ -216,8 +231,8 @@ if __name__ == '__main__':
             f'Found {clfit.num_clusters} no. of clusters to fit. Creating double as many structures...')
         ref_list = open('references.in', 'w')
         ref_list.write(".")
-        for label in range(clfit.num_clusters*2):
-            create_structure(f'ecifit_{label}')
+        for label in range(clfit.num_clusters*args.mult_substructures):
+            create_structure(f'ecifit_{label}',args.percent_shuffle)
             ref_list.write(f'ecifit_{label}\n')
         ref_list.close()
 
@@ -255,11 +270,11 @@ if __name__ == '__main__':
 
     # Generate Full Cluster Description
     try:
-        clusters_full = subprocess.run(['cvmclus', f'-m={phase}/{args.maximal_clusters}', f'-l={structure}/{args.lat}'],
-                                       stdout=subprocess.PIPE,
-                                       stderr=subprocess.PIPE,
-                                       check=True
-                                       )
+        _ = subprocess.run(['cvmclus', f'-m={phase}/{args.maximal_clusters}', f'-l={structure}/{args.lat}'],
+                           stdout=subprocess.PIPE,
+                           stderr=subprocess.PIPE,
+                           check=True
+                           )
     except subprocess.SubprocessError as suberr:
         print('Error in generating cluster configuration files for CVM...')
         print(suberr)
@@ -341,6 +356,9 @@ if __name__ == '__main__':
 
         for eci, cluster_idx in zip(eci_tmp, clusters_full.clusters.keys()):
             clusters_full.eci[cluster_idx] = eci
+
+    if args.fit_eci_only:
+        sys.exit('Flag to fit only detected. Exiting now...')
     # End ECI fitting
     ###
 

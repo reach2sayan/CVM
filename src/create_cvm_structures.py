@@ -1,7 +1,7 @@
 import os
 import random
 
-def create_structure(label):
+def create_structure(label, ps):
     """
     Module to create a subdirectory named <label>
     The str.in and str.out files from the parent structure is taken
@@ -24,15 +24,18 @@ def create_structure(label):
                 else:
                     cell.append(line.rstrip())
 
-            while True:
-                rnd_index1 = random.randint(0, len(positions)-1)
-                rnd_index2 = random.randint(0, len(positions)-1)
+            num_atoms = len(positions)
 
-                if positions[rnd_index1][3] != positions[rnd_index2][3]:
-                    tmp = positions[rnd_index1][3]
-                    positions[rnd_index1][3] = positions[rnd_index2][3]
-                    positions[rnd_index2][3] = tmp
-                    break
+            for _ in range(int(num_atoms*ps))
+                while True:
+                    rnd_index1 = random.randint(0, len(positions)-1)
+                    rnd_index2 = random.randint(0, len(positions)-1)
+
+                    if positions[rnd_index1][3] != positions[rnd_index2][3]:
+                        tmp = positions[rnd_index1][3]
+                        positions[rnd_index1][3] = positions[rnd_index2][3]
+                        positions[rnd_index2][3] = tmp
+                        break
 
             with open(f'{cwd}/{label}/{structure}', 'w') as flabel:
                 for line in cell:
