@@ -16,6 +16,7 @@ eggs/
 .eggs/
 lib/
 lib64/
+lib64
 parts/
 sdist/
 var/
@@ -88,3 +89,4 @@ trial.csv
 BCC_A2
 FCC_A1
 src/old_code
+species.in

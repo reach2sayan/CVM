@@ -56,7 +56,7 @@ if __name__ == '__main__':
                         type=float,
                         help='set numpy random seed (for reproducible experiments)'
                         )
-    clus_fit_params.add_argument('--clusters_fit',
+    clus_fit_params.add_argument('--clusters_fit','-cfit',
                                  default='clusters_fit.out',
                                  help="contain the cluster description for fitting the ECIs ",
                                  )
@@ -68,17 +68,17 @@ if __name__ == '__main__':
                                  default='maxclus.in',
                                  help="constains he name of the maximal cluster file",
                                  )
-    clus_fit_params.add_argument('--fit_eci_only',
+    clus_fit_params.add_argument('--fit_eci_only', '-feo',
                                  action='store_true',
                                  default=False,
                                  help="Flag to only fit ECI and exit.",
                                  )
-    clus_fit_params.add_argument('--skip_eci_fitting',
+    clus_fit_params.add_argument('--skip_eci_fitting', '-sef',
                                  action='store_true',
                                  default=False,
                                  help="Skips the ECI fitting step.",
                                  )
-    clus_fit_params.add_argument('--make_substructures_only', '-ms',
+    clus_fit_params.add_argument('--make_substructures_only',
                                  action='store_true',
                                  default=False,
                                  help="Reads cluster description for fitting to create permuted structures and exists",
@@ -88,7 +88,7 @@ if __name__ == '__main__':
                                  default=0.25,
                                  help="how many times to shuffle labels to create structures for ECI fit",
                                 )
-    clus_fit_params.add_argument('--mult_substructures', '-ps',
+    clus_fit_params.add_argument('--mult_substructures', '-ms',
                                  type=float,
                                  default=2,
                                  help="how many substructures to make as a multiple of number of ECI to fit",
@@ -102,7 +102,7 @@ if __name__ == '__main__':
                              default='vmat.out',
                              help="file containing the vmatrix ",
                              )
-    clus_params.add_argument('--clusters',
+    clus_params.add_argument('--clusters','-cl',
                              default='clusters.out',
                              help="file contain the maximal cluster description ",
                              )
@@ -110,7 +110,7 @@ if __name__ == '__main__':
                              default='configkb.out',
                              help="file containing the kikuchi-barker coefficients ",
                              )
-    clus_params.add_argument('--configcoef',
+    clus_params.add_argument('--configcoef','-ccoef',
                              default='configmult.out',
                              help="file containing coefficient for each subcluster ",
                              )
@@ -230,7 +230,7 @@ if __name__ == '__main__':
         print(
             f'Found {clfit.num_clusters} no. of clusters to fit. Creating double as many structures...')
         ref_list = open('references.in', 'w')
-        ref_list.write(".")
+        ref_list.write(".\n")
         for label in range(clfit.num_clusters*args.mult_substructures):
             create_structure(f'ecifit_{label}',args.percent_shuffle)
             ref_list.write(f'ecifit_{label}\n')
@@ -238,7 +238,6 @@ if __name__ == '__main__':
 
         sys.exit('Created substructures. Now exiting')
     # End of substructure making only.
-    ###
 
     # This part of the code only fits the SRO correction vs T part.
     # This section is repeated at the very end because I didn't want to write another wrapper for 20 lines of code.
@@ -262,7 +261,6 @@ if __name__ == '__main__':
             fout.write(f'{bestC},0')
         sys.exit(1)
     # End of SRO correction fitting to T only
-    ###
 
     sys.stdout = Logger(sys.stdout, args.log, args.toscreen)
     if not args.show_warning:
@@ -331,6 +329,10 @@ if __name__ == '__main__':
                 corr = np.array(corr, dtype=np.float32)  # convert to arrays
                 assert corr[0] == 1
                 correlations[struc] = corr
+
+                print(f'Found structure {struc} with energy : {e/num_atoms}')
+                print(f'Correlations {struc} : {corr}\n')
+
             except FileNotFoundError as fnotf:
                 print(fnotf)
                 print(
@@ -360,7 +362,6 @@ if __name__ == '__main__':
     if args.fit_eci_only:
         sys.exit('Flag to fit only detected. Exiting now...')
     # End ECI fitting
-    ###
 
     results_sro = []
     with open(f'{structure}/energy_atom', 'r') as f:
@@ -426,7 +427,6 @@ if __name__ == '__main__':
         print("Norm Constraint not activated.\n")
         print('Starting T optimisation...\n')
     # End of the calcualting ordered correlations
-    ###
 
     for T in custom_linspace(start=args.Tmin, stop=args.Tmax, step=args.Tstep):
 
@@ -496,7 +496,6 @@ if __name__ == '__main__':
     print('Finished Optimising for SRO correction')
 
     # This section has the same code as above. But does the fit following a full optimisation
-    ###
     if not args.skip_sro:
         print('Fitting SRO corrections to a function of T')
         best_params = sro_T_fit(sro_T,

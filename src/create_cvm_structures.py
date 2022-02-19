@@ -26,7 +26,7 @@ def create_structure(label, ps):
 
             num_atoms = len(positions)
 
-            for _ in range(int(num_atoms*ps))
+            for _ in range(int(num_atoms*ps)):
                 while True:
                     rnd_index1 = random.randint(0, len(positions)-1)
                     rnd_index2 = random.randint(0, len(positions)-1)
