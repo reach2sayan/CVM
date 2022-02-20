@@ -2,6 +2,7 @@ import subprocess
 import numpy as np
 from scipy.linalg import lstsq, LinAlgError
 from sklearn.linear_model import LinearRegression, RANSACRegressor
+from sklearn.metrics import mean_squared_error, r2_score
 
 def fit_eci_scipy(clusters_fit, correlations, energies, structure):
     """
@@ -68,6 +69,12 @@ def fit_eci_ransac(clusters_fit, correlations, energies, structure):
     lr = LinearRegression(fit_intercept = False)
     ransac = RANSACRegressor(base_estimator=lr,loss='squared_loss')
     ransac.fit(mults_corrs, energies_array)
+    for idx, outlier in enumerate(np.logical_not(ransac.inlier_mask_)):
+        if outlier:
+            print(f'Outlier correlation: {mults_corrs[idx]}')
+            print(f'Outlier Energy: {energies_array[idx]}')
+    print(f'Mean Square Error: {mean_squared_error(energies_array[ransac.inlier_mask_], mults_corrs[ransac.inlier_mask_] @ ransac.estimator_.coef_ )}')
+    print(f'R2 score: {r2_score(energies_array[ransac.inlier_mask_], mults_corrs[ransac.inlier_mask_] @ ransac.estimator_.coef_ )}')
     return ransac.estimator_.coef_
 
 

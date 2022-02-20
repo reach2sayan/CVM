@@ -341,8 +341,15 @@ if __name__ == '__main__':
                 print(
                     f"Energy of reference structure {struc.split('/')[-1]} not found. Probably some error in DFT calc")
 
-        #eci_tmp = fit_eci_scipy(clusters_fit, correlations, energies,)
-        eci_tmp = fit_eci_ransac(clusters_fit, correlations,energies, structure)
+        #eci_tmp = fit_eci_scipy(clusters_fit,
+        #                        correlations,
+        #                        energies,
+        #                       )
+        eci_tmp = fit_eci_ransac(clusters_fit,
+                                 correlations,
+                                 energies,
+                                 structure
+                                )
         #eci_tmp, _ = fit_eci_ransac(clusters_fit=clusters_fit,
         #                         correlations=correlations,
         #                         energies=energies,
