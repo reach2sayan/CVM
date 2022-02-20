@@ -12,12 +12,13 @@ import json
 import subprocess
 
 import numpy as np
+import scipy as sp
 
 import optimiser as opt
 from constraints import Constraints
 from bounds import CorrBounds
 from energyfunctions import H, H_jacobian, F, F_jacobian, F_hessian, sro_T
-from fit_eci import fit_eci_scipy, fit_eci_lsfit
+from fit_eci import fit_eci_scipy, fit_eci_lsfit, fit_eci_ransac
 from clusterdata import ClusterInfo
 from logger import Logger
 from create_cvm_structures import create_structure
@@ -56,7 +57,7 @@ if __name__ == '__main__':
                         type=float,
                         help='set numpy random seed (for reproducible experiments)'
                         )
-    clus_fit_params.add_argument('--clusters_fit','-cfit',
+    clus_fit_params.add_argument('--clusters_fit', '-cfit',
                                  default='clusters_fit.out',
                                  help="contain the cluster description for fitting the ECIs ",
                                  )
@@ -87,12 +88,12 @@ if __name__ == '__main__':
                                  type=float,
                                  default=0.25,
                                  help="how many times to shuffle labels to create structures for ECI fit",
-                                )
+                                 )
     clus_fit_params.add_argument('--mult_substructures', '-ms',
                                  type=float,
                                  default=2,
                                  help="how many substructures to make as a multiple of number of ECI to fit",
-                                )
+                                 )
 
     clus_params.add_argument('--eci',
                              default='eci.out',
@@ -102,7 +103,7 @@ if __name__ == '__main__':
                              default='vmat.out',
                              help="file containing the vmatrix ",
                              )
-    clus_params.add_argument('--clusters','-cl',
+    clus_params.add_argument('--clusters', '-cl',
                              default='clusters.out',
                              help="file contain the maximal cluster description ",
                              )
@@ -110,7 +111,7 @@ if __name__ == '__main__':
                              default='configkb.out',
                              help="file containing the kikuchi-barker coefficients ",
                              )
-    clus_params.add_argument('--configcoef','-ccoef',
+    clus_params.add_argument('--configcoef', '-ccoef',
                              default='configmult.out',
                              help="file containing coefficient for each subcluster ",
                              )
@@ -232,7 +233,7 @@ if __name__ == '__main__':
         ref_list = open('references.in', 'w')
         ref_list.write(".\n")
         for label in range(clfit.num_clusters*args.mult_substructures):
-            create_structure(f'ecifit_{label}',args.percent_shuffle)
+            create_structure(f'ecifit_{label}', args.percent_shuffle)
             ref_list.write(f'ecifit_{label}\n')
         ref_list.close()
 
@@ -263,6 +264,8 @@ if __name__ == '__main__':
     # End of SRO correction fitting to T only
 
     sys.stdout = Logger(sys.stdout, args.log, args.toscreen)
+    print(f'Phase: {phase}')
+    print(f'Structure : {structure}')
     if not args.show_warning:
         warnings.filterwarnings("ignore")
 
@@ -330,17 +333,27 @@ if __name__ == '__main__':
                 assert corr[0] == 1
                 correlations[struc] = corr
 
-                print(f'Found structure {struc} with energy : {e/num_atoms}')
-                print(f'Correlations {struc} : {corr}\n')
+                print(f"Found structure {struc.split('/')[-1]} with energy : {e/num_atoms}")
+                print(f"Correlations {struc.split('/')[-1]} : {corr}\n")
 
             except FileNotFoundError as fnotf:
                 print(fnotf)
                 print(
-                    f'Energy of reference structure {struc} not found. Probably some error in DFT calc')
+                    f"Energy of reference structure {struc.split('/')[-1]} not found. Probably some error in DFT calc")
 
-        #eci_tmp = fit_eci_scipy(clusters_fit, correlations, energies, structure)
-        eci_tmp = fit_eci_lsfit(
-            clusters_fit, correlations, energies, structure)
+        #eci_tmp = fit_eci_scipy(clusters_fit, correlations, energies,)
+        eci_tmp = fit_eci_ransac(clusters_fit, correlations,energies, structure)
+        #eci_tmp, _ = fit_eci_ransac(clusters_fit=clusters_fit,
+        #                         correlations=correlations,
+        #                         energies=energies,
+        #                         seed=args.seed,
+        #                         min_points=2,
+        #                         max_iterations=100,
+        #                         threshold=2,
+        #                         min_inliners=16
+        #                         )
+        #eci_tmp = fit_eci_lsfit(
+        #    clusters_fit, correlations, energies, structure)
 
         eci_tmp = np.array(
             [*eci_tmp, *np.zeros(clusters_full.num_clusters - clusters_fit.num_clusters)])
