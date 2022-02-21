@@ -242,10 +242,10 @@ class ClusterInfo:
         configs = {}
 
         try:
-            fconfig = open(config_fname, 'r')
-            _ = next(fconfig)  # Ignore first line
+            with open(config_fname, 'r') as fconfig:
+                _ = next(fconfig)  # Ignore first line
 
-            temp_config = fconfig.read()  # .split('\n\n')
+                temp_config = fconfig.read()  # .split('\n\n')
         except FileNotFoundError as fnfe:
             print(f"Config Description file {config_fname.split('/')[-1]} not found. Since this is not explicitly used in calculation. The programs shall continue.")
             return None

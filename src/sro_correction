@@ -10,6 +10,7 @@ import sys
 import warnings
 import json
 import subprocess
+from datetime import date
 
 import numpy as np
 import scipy as sp
@@ -37,7 +38,7 @@ if __name__ == '__main__':
         return np.linspace(start, stop, int((stop - start) / step + 1))
 
     np.set_printoptions(suppress=True, precision=4)
-
+    date = date.today().strftime('%b-%d')
     structure = os.getcwd()
     path = Path(structure)
     phase = str(path.parent.absolute())
@@ -206,7 +207,7 @@ if __name__ == '__main__':
                             help="Enables to show warning ",
                             )
     opt_params.add_argument('--out',
-                            default='latest_result.json',
+                            default='result.json',
                             help="Indicates the name of the output file ",
                             )
     opt_params.add_argument('--toscreen',
@@ -220,6 +221,19 @@ if __name__ == '__main__':
                             )
 
     args = parser.parse_args()
+
+    if not args.no_constraint:
+        args.log = f'{args.log}-cons-{date}'
+        args.out = f'{args.out}-cons-{date}'
+    else:
+        args.log = f'{args.log}-nocons-{date}'
+        args.out = f'{args.out}-nocons-{date}'
+
+    sys.stdout = Logger(sys.stdout, args.log, args.toscreen)
+    print(f'Phase: {phase}')
+    print(f'Structure : {structure}')
+    if not args.show_warning:
+        warnings.filterwarnings("ignore")
 
     # This part of the code only makes the subdirectories on which the user to run DFT.
     # To generate data for ECI fitting
@@ -263,11 +277,6 @@ if __name__ == '__main__':
         sys.exit(1)
     # End of SRO correction fitting to T only
 
-    sys.stdout = Logger(sys.stdout, args.log, args.toscreen)
-    print(f'Phase: {phase}')
-    print(f'Structure : {structure}')
-    if not args.show_warning:
-        warnings.filterwarnings("ignore")
 
     # Generate Full Cluster Description
     try:
@@ -445,6 +454,8 @@ if __name__ == '__main__':
         print('Starting T optimisation...\n')
     else:
         print("Norm Constraint not activated.\n")
+        print("Turning off SRO fit flag since constraint is not activated.\n")
+        args.skip_sro_fit = True
         print('Starting T optimisation...\n')
     # End of the calcualting ordered correlations
 
