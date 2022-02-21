@@ -1,8 +1,11 @@
 import subprocess
 import numpy as np
 from scipy.linalg import lstsq, LinAlgError
-from sklearn.linear_model import LinearRegression, RANSACRegressor
-from sklearn.metrics import mean_squared_error, r2_score
+try:
+    from sklearn.linear_model import LinearRegression, RANSACRegressor
+    from sklearn.metrics import mean_squared_error, r2_score
+except:
+    print("scikit learn not found. Cannot use RANSACRegressor")
 
 def fit_eci_scipy(clusters_fit, correlations, energies, structure):
     """

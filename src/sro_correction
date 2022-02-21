@@ -62,6 +62,16 @@ if __name__ == '__main__':
                                  default='clusters_fit.out',
                                  help="contain the cluster description for fitting the ECIs ",
                                  )
+    clus_fit_params.add_argument('--use_lsfit', '-lsfit',
+                                 action='store_true',
+                                 default=False,
+                                 help="Use ATAT lsfit to fit ECI",
+                                )
+    clus_fit_params.add_argument('--use_ransac', '-ransac',
+                                 action='store_true',
+                                 default=True,
+                                 help="Use sklearn RANSACRegressor ECI",
+                                )
     clus_fit_params.add_argument('--reference_structures', '-ref',
                                  default='references.in',
                                  help="contains the names of the reference structures used to fit ECI",
@@ -230,8 +240,8 @@ if __name__ == '__main__':
         args.out = f'{args.out}-nocons-{date}'
 
     sys.stdout = Logger(sys.stdout, args.log, args.toscreen)
-    print(f'Phase: {phase}')
-    print(f'Structure : {structure}')
+    print(f"Phase: {phase.split('/')[-1]}")
+    print(f"Structure : {structure.split('/')[-1]}")
     if not args.show_warning:
         warnings.filterwarnings("ignore")
 
@@ -349,28 +359,16 @@ if __name__ == '__main__':
                 print(fnotf)
                 print(
                     f"Energy of reference structure {struc.split('/')[-1]} not found. Probably some error in DFT calc")
-
-        #eci_tmp = fit_eci_scipy(clusters_fit,
-        #                        correlations,
-        #                        energies,
-        #                       )
-        eci_tmp = fit_eci_ransac(clusters_fit,
-                                 correlations,
-                                 energies,
-                                 structure
-                                )
-        #eci_tmp, _ = fit_eci_ransac(clusters_fit=clusters_fit,
-        #                         correlations=correlations,
-        #                         energies=energies,
-        #                         seed=args.seed,
-        #                         min_points=2,
-        #                         max_iterations=100,
-        #                         threshold=2,
-        #                         min_inliners=16
-        #                         )
-        #eci_tmp = fit_eci_lsfit(
-        #    clusters_fit, correlations, energies, structure)
-
+        
+        if args.use_lsfit:
+            eci_tmp = fit_eci_lsfit(
+                clusters_fit, correlations, energies, structure)
+        elif args.use_ransac:
+            eci_tmp = fit_eci_ransac(clusters_fit,
+                                     correlations,
+                                     energies,
+                                     structure
+                                    )
         eci_tmp = np.array(
             [*eci_tmp, *np.zeros(clusters_full.num_clusters - clusters_fit.num_clusters)])
         for index, eci in clusters_full.eci.items():

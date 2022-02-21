@@ -33,7 +33,11 @@ def plot_eci_fit(energy_file='ref_energies.in',
     plt.grid(True)
     plt.suptitle('ECI Fit')
     plt.tight_layout()
-    plt.savefig(img_name, dpi=300)
+    if len(sys.argv) > 2:
+        plt.savefig(sys.argv[2], dpi=300)
+    else:
+        plt.savefig(img_name, dpi=300)
+
 
 
 def plot_sro_fit(xdata_file='x_sro.dat',

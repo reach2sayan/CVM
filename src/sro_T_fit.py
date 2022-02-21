@@ -3,7 +3,10 @@ Module containing code to fit ECI
 """
 import sys
 import json
-from lmfit import Model, Parameters
+try:
+    from lmfit import Model, Parameters
+except ImportError as ie:
+    print('WARNING: lmfit not found. SRO T fit cannot be obtained.')
 import numpy as np
 
 
