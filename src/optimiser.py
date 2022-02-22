@@ -26,7 +26,10 @@ def find_ordered(cluster_data, corr, method, options, no_fix_point=False, print_
         corr_bounds = [(corr[idx], corr[idx]) if cluster['type'] == 1 else (
             1, 1) if cluster['type'] == 0 else (-1, 1) for idx, cluster in cluster_data.clusters.items()]
     else:
-        corr_bounds = [(1, 1) if cluster['type'] == 0 else (-1, 1) for idx, cluster in cluster_data.clusters.items()]
+        if cluster_data.clusters is None:
+            corr_bounds = [(-1, 1) for _ in cluster_data.eci]
+        else:
+            corr_bounds = [(1, 1) if cluster['type'] == 0 else (-1, 1) for idx, cluster in cluster_data.clusters.items()]
 
     ecis = np.array(list(cluster_data.eci.values())),
     mults = np.array(list(cluster_data.clustermult.values()))

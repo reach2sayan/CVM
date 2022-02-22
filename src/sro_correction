@@ -543,6 +543,9 @@ if __name__ == '__main__':
         with open(args.out, 'w') as fout:
             json.dump(results_sro, fout)
 
+    np.savetxt(f"{args.out.replace('json','out')}",results_sro[corrcols].values)
+    e_corrected = results_sro['F_cvm'].values - results_sro['rnd'].values
+    np.savetxt(f"{args.out.replace('json','energy_corrected')}", e_corrected)
     print('Finished Optimising for SRO correction')
 
     # This section has the same code as above. But does the fit following a full optimisation
