@@ -8,7 +8,7 @@ from scipy.optimize import BFGS
 from scipy.optimize import linprog
 
 
-def find_ordered(cluster_data, corr, method, options, fix_point=True, print_output=True,):
+def find_ordered(cluster_data, corr, method, options, no_fix_point=False, print_output=True,):
     """
     Finds the ordered structure given cluster information using Linear Programming
     Input:
@@ -22,7 +22,7 @@ def find_ordered(cluster_data, corr, method, options, fix_point=True, print_outp
 
     all_vmat = -1 * np.vstack([vmat for vmat in cluster_data.vmat.values()])
     vmat_limit = np.zeros(all_vmat.shape[0])
-    if fix_point:
+    if not no_fix_point:
         corr_bounds = [(corr[idx], corr[idx]) if cluster['type'] == 1 else (
             1, 1) if cluster['type'] == 0 else (-1, 1) for idx, cluster in cluster_data.clusters.items()]
     else:

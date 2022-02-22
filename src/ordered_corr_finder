@@ -42,9 +42,9 @@ if __name__ == '__main__':
                         default=1e-18,
                         help='Tolerance'
                         )
-    parser.add_argument('--fix_point', '-fp',
+    parser.add_argument('--no_fix_point', '-fp',
                         action='store_true',
-                        default=True,
+                        default=False,
                         help='Flag to enable fixed point correlations'
                         )
     parser.add_argument('--display', '-d',
@@ -68,15 +68,15 @@ if __name__ == '__main__':
                }
     try:
         corr = np.loadtxt(args.corrs)
-    except FileNotFoundError:
+    except OSError:
         corr = None
-        args.fix_point = False
+        args.no_fix_point = True
 
     result = opt.find_ordered(cluster_data=cluster,
                               corr=corr,
                               method='revised simplex',
                               options=options,
-                              fix_point=args.fix_point
+                              no_fix_point=args.no_fix_point
                               )
     corr_ord = result.x
     print(f"Ordered correlation\t: {corr_ord}")
