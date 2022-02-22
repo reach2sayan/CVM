@@ -17,23 +17,15 @@ def sro_T(T, **params):
     return -np.abs(params['C'])*np.abs(r)
 
 
-def H(corrs, vmat, kb, clusters, configcoef, T, eci):
-    return np.sum([cluster['mult']*eci[cluster_idx]*corrs[cluster_idx] for cluster_idx, cluster in clusters.items()])
-
-def H_jacobian(corrs, vmat, kb, clusters, configcoef, T, eci):
-    return np.array([cluster['mult']*eci[cluster_idx]
-                     for cluster_idx, cluster in clusters.items()
-                     ])
-
-
-def F(corrs, vmat, kb, clusters, configcoef, T, eci):
+def F(corrs, vmat, kb, clusters, clustermult, configmult, T, eci):
     """
     Input:
     corrs - Correlations
     vmat  - V-Matrix
     clusters - Maximal Cluster Information (multiplicity, longest neighbor length, no. of points)
     configs - Not used
-    configcoef - Coefficients of subclusters - array containing the coeff of each subcluster
+    clustermult - Multiplicities of clusters
+    configmult - Multiplicities of configurations
     T - Temperature
     eci - ECI's
 
@@ -48,32 +40,33 @@ def F(corrs, vmat, kb, clusters, configcoef, T, eci):
             return 0
         return corrsum*math.log(np.abs(corrsum))
 
-    def per_cluster_sum(corrs, vmat, configcoef):
+    def per_cluster_sum(corrs, vmat, configmult):
         config_sum = np.sum([coef*get_corrsum(vmat[config_idx], corrs)
-                             for config_idx, coef in enumerate(configcoef)
+                             for config_idx, coef in enumerate(configmult)
                              ])
         return config_sum
 
-    H = np.sum([cluster['mult']*eci[cluster_idx]*corrs[cluster_idx]
-                for cluster_idx, cluster in clusters.items()
+    H = np.sum([clustermult[cluster_idx]*eci[cluster_idx]*corrs[cluster_idx]
+                for cluster_idx in clusters
                 ])
     S = np.sum([kb[config_idx]*per_cluster_sum(corrs,
                                                vmat[config_idx],
-                                               configcoef[config_idx],)
-                for config_idx in configcoef.keys()
+                                               configmult[config_idx],)
+                for config_idx in configmult
                 ])
 
     return H + kB*T*S
 
 
-def F_jacobian(corrs, vmat, kb, clusters, configcoef, T, eci):
+def F_jacobian(corrs, vmat, kb, clusters, clustermult, configmult, T, eci):
     """
     Input: 
     corrs - Correlations
     vmat  - V-Matrix
     clusters - Maximal Cluster Information (multiplicity, longest neighbor length, no. of points)
     configs - Not used
-    configcoef - Coefficients of subclusters - array containing the coeff of each subcluster
+    clustermult - Multiplicities of clusters
+    configmult - Multiplicities of configurations
     T - Temperature
     eci - ECI's
 
@@ -82,14 +75,14 @@ def F_jacobian(corrs, vmat, kb, clusters, configcoef, T, eci):
     [dF/dcorr0, dF/dcorr1, ...]
     """
 
-    def get_kth_elem_jac(corrs, vmat, kb, clusters, configcoef, corr_idx):
+    def get_kth_elem_jac(corrs, vmat, kb, configmult, corr_idx):
 
         dS_k = np.sum([kb[config_idx] * per_cluster_sum_jac(corrs,
                                                             vmat[config_idx],
-                                                            configcoef[config_idx],
+                                                            configmult[config_idx],
                                                             corr_idx,
                                                             )
-                       for config_idx in configcoef.keys()
+                       for config_idx in configmult
                        ])
         return dS_k
 
@@ -98,31 +91,32 @@ def F_jacobian(corrs, vmat, kb, clusters, configcoef, T, eci):
         corrsum = np.inner(vmat, corrs)
         return 1 + math.log(np.abs(corrsum))
 
-    def per_cluster_sum_jac(corrs, vmat, configcoef, corr_idx):
+    def per_cluster_sum_jac(corrs, vmat, configmult, corr_idx):
 
         config_sum = np.sum([coef * vmat[config_idx][corr_idx] * get_corrsum_jac(vmat[config_idx], corrs)
-                             for config_idx, coef in enumerate(configcoef)
+                             for config_idx, coef in enumerate(configmult)
                              ])
         return config_sum
 
-    dH = np.array([cluster['mult']*eci[cluster_idx]
-                   for cluster_idx, cluster in clusters.items()
+    dH = np.array([clustermult[cluster_idx]*eci[cluster_idx]
+                   for cluster_idx in clusters
                    ])
-    dS = np.array([get_kth_elem_jac(corrs, vmat, kb, clusters, configcoef, corr_idx)
+    dS = np.array([get_kth_elem_jac(corrs, vmat, kb, configmult, corr_idx)
                    for corr_idx, _ in enumerate(corrs)
                    ])
 
     return dH + kB*T*dS
 
 
-def F_hessian(corrs, vmat, kb, clusters, configcoef, T, eci):
+def F_hessian(corrs, vmat, kb, clusters, clustermult, configmult, T, eci):
     """
     Input:
     corrs - Correlations
     vmat  - V-Matrix
     clusters - Maximal Cluster Information (multiplicity, longest neighbor length, no. of points)
     configs - Not used
-    configcoef - Coefficients of subclusters - array containing the coeff of each subcluster
+    clustermult - Multiplicities of clusters
+    configmult - Multiplicities of configurations
     T - Temperature
     eci - ECI's
 
@@ -143,29 +137,29 @@ def F_hessian(corrs, vmat, kb, clusters, configcoef, T, eci):
         corrsum = np.inner(vmat, corrs)
         return corrsum
 
-    def get_config_val(corrs, vmat, configcoef, corr_idx_1, corr_idx_2):
+    def get_config_val(corrs, vmat, configmult, corr_idx_1, corr_idx_2):
 
         config_val = np.sum([coef * vmat[config_idx][corr_idx_1] * vmat[config_idx][corr_idx_2] / get_corrsum_hess(vmat[config_idx], corrs)
-                             for config_idx, coef in enumerate(configcoef)
+                             for config_idx, coef in enumerate(configmult)
                              ])
 
         return config_val
 
-    def get_hessian_elem(corrs, vmat, kb, configcoef, corr_idx_1, corr_idx_2):
+    def get_hessian_elem(corrs, vmat, kb, configmult, corr_idx_1, corr_idx_2):
 
         hess_elem = np.sum([kb[config_idx] * get_config_val(corrs,
                                                             vmat[config_idx],
-                                                            configcoef[config_idx],
+                                                            configmult[config_idx],
                                                             corr_idx_1,
                                                             corr_idx_2
                                                             )
-                            for config_idx in configcoef.keys()
+                            for config_idx in configmult
                             ])
         return hess_elem
 
     d2F = np.empty([len(corrs), len(corrs)])
 
-    d2F = np.array([[get_hessian_elem(corrs, vmat, kb, configcoef, corr_idx_1, corr_idx_2)
+    d2F = np.array([[get_hessian_elem(corrs, vmat, kb, configmult, corr_idx_1, corr_idx_2)
                      for corr_idx_2, _ in enumerate(corrs)] for corr_idx_1, _ in enumerate(corrs)])
 
     return kB*T*d2F

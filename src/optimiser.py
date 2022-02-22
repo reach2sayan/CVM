@@ -5,6 +5,52 @@ Optimiser module for SRO Correction
 import numpy as np
 from scipy.optimize import minimize
 from scipy.optimize import BFGS
+from scipy.optimize import linprog
+
+
+def find_ordered(cluster_data, corr, method, options, fix_point=True, print_output=True,):
+    """
+    Finds the ordered structure given cluster information using Linear Programming
+    Input:
+        cluster_data - ClusterInfo object contatning vmat, eci and cluster information
+        corr - sample corr, only used as a guess for the refined simplex method. This also
+               specified the point correlations that are kept fixed.
+        method - method of the linear programming; simplex or interior point
+        options - extra options for the linear programming problem
+    Output
+    """
+
+    all_vmat = -1 * np.vstack([vmat for vmat in cluster_data.vmat.values()])
+    vmat_limit = np.zeros(all_vmat.shape[0])
+    if fix_point:
+        corr_bounds = [(corr[idx], corr[idx]) if cluster['type'] == 1 else (
+            1, 1) if cluster['type'] == 0 else (-1, 1) for idx, cluster in cluster_data.clusters.items()]
+    else:
+        corr_bounds = [(1, 1) if cluster['type'] == 0 else (-1, 1) for idx, cluster in cluster_data.clusters.items()]
+
+    ecis = np.array(list(cluster_data.eci.values())),
+    mults = np.array(list(cluster_data.clustermult.values()))
+    obj = ecis*mults
+
+    result = linprog(obj,
+                     A_ub=all_vmat,
+                     b_ub=vmat_limit,
+                     bounds=corr_bounds,
+                     options=options,
+                     method=method
+                     )
+    if result.success:
+        print('Ordered State calculations completed...')
+        if print_output:
+            np.savetxt('ordered_correlations.out',result.x)
+            with open('ordered_rho.out','w') as frho:
+                for vmat in cluster_data.vmat.values():
+                    frho.write(f'{" ".join(map(str,vmat@result.x))}\n')
+
+        return result
+    print(
+        f'WARNING: linear programming for ordered correlation search failed: {result.status} - {result.message}\nExiting...')
+    return result
 
 
 def fit(F,
@@ -52,14 +98,15 @@ def fit(F,
                               )
             corrs_attempt = corrs_trial+jitter
 
-        #print(f'{_} : {corrs_attempt}',)
+        print(f'{_} : {corrs_attempt}',)
         temp_results = minimize(F,
                                 corrs_attempt,
                                 method='trust-constr',
                                 args=(cluster_data.vmat,
                                       cluster_data.kb,
                                       cluster_data.clusters,
-                                      cluster_data.configcoef,
+                                      cluster_data.clustermult,
+                                      cluster_data.configmult,
                                       temp,
                                       cluster_data.eci),
                                 options=options,

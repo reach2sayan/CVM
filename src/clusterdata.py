@@ -7,11 +7,12 @@ class ClusterInfo:
     """
     Class containing the clusters information.
     Input: Filenames containing
-           1. No. of clusters,
+           1. Cluster File,
            2. ECI
            3. Kikuchi-Baker Coefficients
+           4. Cluster Coefficients
            4. Config Coefficients
-           5. Config INformation (this is not particularly used in calculations)
+           5. Config Information (this is not particularly used in calculations)
            6. V-Matrix (for correlations --> rhos)
            7. Cluster Only Flag (to avoid loding extra files if cluster variation is not required)
     Properties:
@@ -27,45 +28,37 @@ class ClusterInfo:
     def __init__(self, clusters_fname,
                  eci_fname=None,
                  kb_fname=None,
-                 configcoef_fname=None,
+                 clustermult_fname=None,
+                 configmult_fname=None,
                  config_fname=None,
                  vmat_fname=None,
                  cluster_only=False):
 
-        try:
-            if cluster_only:
-                print(
-                    'Creating an Object with cluster and ECI only. Not suitable for CVM.')
-                self.clusters = ClusterInfo.read_clusters(clusters_fname)
-                self.kb = None
-                self.configcoef = None
-                self.configs = None
-                self.vmat = None
-                self.eci = {idx: 0.0 for idx in self.clusters}
-            else:
-                self.clusters = ClusterInfo.read_clusters(clusters_fname)
-                self.kb = ClusterInfo.read_kbcoeffs(kb_fname)
-                self.configcoef = ClusterInfo.read_configcoef(configcoef_fname)
-                self.configs = ClusterInfo.read_configs(config_fname)
-                self.vmat = ClusterInfo.read_vmatrix(vmat_fname)
-                self.eci = ClusterInfo.read_eci(eci_fname, len(self.clusters))
-        except FileNotFoundError as fnfe:
-            print('File Not Found for instanting cluster description. Exiting...')
-            print(fnfe)
-            sys.exit(1)
-
-#        if not cluster_only:
-#            try:
-#                assert len(self.eci) == len(self.clusters)
-#            except AssertionError:
-#                print(
-#                    f'Number of ECIs ({len(self.eci)}) does not match number of clusters ({len(self.clusters)}). Exiting...')
-#                sys.exit(1)
+        if cluster_only:
+            print(
+                'Creating an Object with cluster and ECI only. Not suitable for CVM.')
+            self.clusters = ClusterInfo.read_clusters(clusters_fname)
+            self.kb = None
+            self.configmult = None
+            self.clustermult = None
+            self.configs = None
+            self.vmat = None
+            self.eci = {idx: 0.0 for idx in self.clusters}
+        else:
+            self.clusters = ClusterInfo.read_clusters(clusters_fname)
+            self.kb = ClusterInfo.read_kbcoeffs(kb_fname)
+            self.configmult = ClusterInfo.read_configmult(configmult_fname)
+            self.clustermult = ClusterInfo.read_clustermult(
+                clustermult_fname, len(self.clusters))
+            self.configs = ClusterInfo.read_configs(config_fname)
+            self.vmat = ClusterInfo.read_vmatrix(vmat_fname)
+            self.eci = ClusterInfo.read_eci(eci_fname, len(self.clusters))
 
     def get_rho(self, corrs):
 
-        for config_idx in self.configcoef.keys():
-            print(self.vmat[config_idx] @ corrs)
+        for vmat in self.vmat.values():
+            print(f"{' '.join(map(str, vmat @ corrs))}")
+            #print(vmat @ corrs)
         return
 
     def __repr__(self):
@@ -78,13 +71,15 @@ class ClusterInfo:
         print(self.vmat)
         print("Clusters:")
         print(self.clusters)
-        print("Cluster Coefficients:")
-        print(self.configcoef)
+        print("Config Multiplicities:")
+        print(self.configmult)
+        print("Cluster Multiplicities:")
+        print(self.clustermult)
         return ''
 
     @property
     def num_configs(self):
-        return len(self.configcoef)
+        return len(self.configmult)
 
     @property
     def single_point_clusters(self):
@@ -96,9 +91,11 @@ class ClusterInfo:
 
     def check_result_validity(self, corrs):
         try:
-            for config_idx in self.configcoef:
-                assert np.isclose(np.inner(self.configcoef[config_idx], np.matmul(
-                    self.vmat[config_idx], corrs)), 1.0, rtol=1e-3)
+            for config_idx in self.configmult:
+                assert np.isclose(np.inner(self.configmult[config_idx], self.vmat[config_idx] @ corrs),
+                                  1.0,
+                                  rtol=1e-3
+                                  )
         except AssertionError:
             print("Invalid Rho")
             return False
@@ -115,7 +112,11 @@ class ClusterInfo:
                 # Read blocks separated by 1 empty line
                 temp_clusters = fclusters.read().split('\n\n')
         except FileNotFoundError as fnfe:
-            sys.exit(f"CLuster description file {clusters_fname.split('/')[-1]} not found. Exiting...")
+            print(
+                f"WARNING: CLuster description file {clusters_fname.split('/')[-1]} not found. ")
+            return None
+        except TypeError:
+            return None
 
         for idx, cluster in enumerate(temp_clusters):
             if cluster == '':
@@ -142,7 +143,11 @@ class ClusterInfo:
             temp_kb = fkb.read()
             fkb.close()
         except FileNotFoundError as fnfe:
-            sys.exit(f"Kikuchi-Barker coefficients file {kb_fname.split('/')[-1]} not found. Exiting...")
+            print(
+                f"WARNING: Kikuchi-Barker coefficients file {kb_fname.split('/')[-1]} not found. ")
+            return None
+        except TypeError:
+            return None
 
         temp_kb = temp_kb.split('\n')  # split file linewise
         for idx, kbcoeff in enumerate(temp_kb):
@@ -153,29 +158,57 @@ class ClusterInfo:
         return kb
 
     @classmethod
-    def read_configcoef(cls, configcoef_fname):
+    def read_configmult(cls, configmult_fname):
 
-        configcoef = {}
+        configmult = {}
         pattern1 = re.compile("\n\n\n")
         pattern2 = re.compile("\n\n")
 
         try:
-            with open(configcoef_fname, 'r') as fsubmult:
+            with open(configmult_fname, 'r') as fsubmult:
                 _ = next(fsubmult)  # ignore first line
                 temp_submult = fsubmult.read()
                 # split lines into blocks separated by 2 empty lines
                 temp_submult = pattern2.split(temp_submult)
         except FileNotFoundError as fnfe:
-            sys.exit(f"Config Multiplicities file {configcoef_fname.split('/')[-1]} not found. Exiting...")
+            print(
+                f"WARNING: Config Multiplicities file {configmult_fname.split('/')[-1]} not found. ")
+            return None
+        except TypeError:
+            return None
 
         for idx, submult in enumerate(temp_submult[:-1]):
             submult = submult.split('\n')  # split into number of subclusters
             while("" in submult):
                 submult.remove("")  # remove empty blocks
             # also ignore 1st line of each block
-            configcoef[idx] = list(map(float, submult[1:]))
+            configmult[idx] = list(map(float, submult[1:]))
 
-        return configcoef
+        return configmult
+
+    @classmethod
+    def read_clustermult(cls, clustermult_fname, numclus):
+
+        # Read cluster multiplicities
+        clustermult = {}
+        try:
+            with open(clustermult_fname, 'r') as fcm:
+                _ = next(fcm)  # Ignore first line
+                temp_mult = fcm.read()
+                temp_mult = temp_mult.split('\n')  # split by line
+
+            for idx, mult in enumerate(temp_mult):
+                if mult == '':
+                    continue
+                clustermult[idx] = float(mult)
+        except FileNotFoundError:
+            print(
+                f"WARNING: Cluster Multiplicities file {clustermult_fname.split('/')[-1]} not found. ")
+            return None
+        except TypeError:
+            return None
+
+        return clustermult
 
     @classmethod
     def read_vmatrix(cls, vmat_fname):
@@ -189,7 +222,11 @@ class ClusterInfo:
                 _ = next(fvmat)  # ignore first lie
                 temp_vmat = fvmat.read()
         except FileNotFoundError as fnfe:
-            sys.exit(f"Vmat file {vmat_fname.split('/')[-1]} not found. Exiting...")
+            print(
+                f"WARNING: Vmat file {vmat_fname.split('/')[-1]} not found. ")
+            return None
+        except TypeError:
+            return None
 
         # split by 2 empty lines i.e. maxclusters
         temp_vmat = pattern2.split(temp_vmat)
@@ -218,13 +255,15 @@ class ClusterInfo:
                 temp_eci = feci.read()
                 temp_eci = temp_eci.split('\n')  # split by line
 
-            print(f"Reading ECIs from existing file {eci_fname.split('/')[-1]}.")
+            print(
+                f"Reading ECIs from existing file {eci_fname.split('/')[-1]}.")
             for idx, eci_val in enumerate(temp_eci):
                 if eci_val == '':
                     continue
                 eci[idx] = float(eci_val)
         except FileNotFoundError:
-            print(f"No pre-existing {eci_fname.split('/')[-1]} file found. Instantiating with all zeros")
+            print(
+                f"No pre-existing {eci_fname.split('/')[-1]} file found. Instantiating with all zeros")
             temp_eci = np.array([0]*numclus)
 
             for idx, eci_val in enumerate(temp_eci):
@@ -247,8 +286,12 @@ class ClusterInfo:
 
                 temp_config = fconfig.read()  # .split('\n\n')
         except FileNotFoundError as fnfe:
-            print(f"Config Description file {config_fname.split('/')[-1]} not found. Since this is not explicitly used in calculation. The programs shall continue.")
+            print(
+                f"WARNING: Config Description file {config_fname.split('/')[-1]} not found. Since this is not explicitly used in calculation. The programs shall continue.")
             return None
+        except TypeError:
+            return None
+
         # split lines separated by 2 empty lines
         temp_config = pattern1.split(temp_config)
 

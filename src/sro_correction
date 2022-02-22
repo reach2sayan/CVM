@@ -18,7 +18,7 @@ import scipy as sp
 import optimiser as opt
 from constraints import Constraints
 from bounds import CorrBounds
-from energyfunctions import H, H_jacobian, F, F_jacobian, F_hessian, sro_T
+from energyfunctions import F, F_jacobian, F_hessian, sro_T
 from fit_eci import fit_eci_scipy, fit_eci_lsfit, fit_eci_ransac
 from clusterdata import ClusterInfo
 from logger import Logger
@@ -118,13 +118,17 @@ if __name__ == '__main__':
                              default='clusters.out',
                              help="file contain the maximal cluster description ",
                              )
+    clus_params.add_argument('--clustermult',
+                             default='clusmult.out',
+                             help="file containing multiplicities for each cluster ",
+                            )
     clus_params.add_argument('--kb',
                              default='configkb.out',
                              help="file containing the kikuchi-barker coefficients ",
                              )
-    clus_params.add_argument('--configcoef', '-ccoef',
+    clus_params.add_argument('--configmult',
                              default='configmult.out',
-                             help="file containing coefficient for each subcluster ",
+                             help="file containing multiplicities for each configuration ",
                              )
     clus_params.add_argument('--config',
                              default='config.out',
@@ -155,7 +159,7 @@ if __name__ == '__main__':
                                 type=int,
                                 help="Maximum power of the fit ",
                                 )
-    sro_fit_params.add_argument('--method',
+    sro_fit_params.add_argument('--sro_method',
                                 default='least-squares',
                                 help="method of fitting a function on T to the SRO correction",
                                 )
@@ -188,6 +192,15 @@ if __name__ == '__main__':
                             default=False,
                             help="Flag to disable norm constraint "
                             )
+    opt_params.add_argument('--fit_ordered_only',
+                            action='store_true',
+                            default=False,
+                            help="Flag to find find_ordered state only and exit."
+                           )
+    opt_params.add_argument('--linprog_method',
+                            default='revised simplex',
+                            help="Method of linear programming for findiing ordered correlations",
+                           )
     opt_params.add_argument('--verbose', '-v', action='count', default=0,
                             help="Indicate the verbosity of the fit ",
                             )
@@ -273,7 +286,7 @@ if __name__ == '__main__':
                                 args.out,
                                 args.coeff_in,
                                 args.skip_expo,
-                                args.method,
+                                args.sro_method,
                                 args.verbose
                                 )
 
@@ -303,7 +316,8 @@ if __name__ == '__main__':
     print("Cluster Description for CVM:")
     clusters_full = ClusterInfo(clusters_fname=f'{structure}/{args.clusters}',
                                 kb_fname=f'{structure}/{args.kb}',
-                                configcoef_fname=f'{structure}/{args.configcoef}',
+                                clustermult_fname=f'{structure}/{args.clustermult}',
+                                configmult_fname=f'{structure}/{args.configmult}',
                                 config_fname=f'{structure}/{args.config}',
                                 vmat_fname=f'{structure}/{args.vmat}',
                                 eci_fname=f'{structure}/{args.eci}',
@@ -406,6 +420,7 @@ if __name__ == '__main__':
     corr_rnd = np.array(corr_rnd, dtype=np.float32)  # convert to arrays
     assert corr_rnd[0] == 1
     assert clusters_full.check_result_validity(corr_rnd)
+    np.savetxt('disordered_correlations.out',corr_rnd)
 
     FIXED_CORRS = corr_rnd[clusters_full.single_point_clusters]
     constraints = Constraints(clusters_full)
@@ -416,41 +431,46 @@ if __name__ == '__main__':
     # Is skipped if no norm constraint if requried
     if not args.no_constraint:
         print("Norm Constraint activated...\n")
-        constraints_ord = constraints.get_constraints_ordered(corr_rnd)
-        bounds_ord = bounds.get_sro_bounds(FIXED_CORRS)
 
-        options = {'verbose': args.verbose,
+        options = {'disp': bool(args.verbose),
                    'maxiter': args.maxiter,
-                   'xtol': args.xtol,
-                   'gtol': args.gtol,
-                   'initial_constr_penalty': 10
-                   }
+                   'tol': args.xtol,
+                  }
 
         print('Calculating Ordered Correlation....')
-        result_ord = opt.fit(F=H,
-                             cluster_data=clusters_full,
-                             temp=0,
-                             options=options,
-                             jac=H_jacobian,
-                             hess=None,
-                             NUM_TRIALS=50,
-                             bounds=bounds_ord,
-                             constraints=constraints_ord,
-                             corrs_trial=corr_rnd,
-                             approx_deriv=True,
-                             display_inter=True,
-                             init_random=True,
-                             seed=args.seed
-                             )
-
+        result_ord = opt.find_ordered(cluster_data=clusters_full,
+                                      corr=corr_rnd,
+                                      method=args.linprog_method,
+                                      options=options,
+                                     )
         corr_ord = result_ord.x
         print(f"Ordered correlation\t: {corr_ord}")
         ord2disord_dist = np.linalg.norm(corr_ord - corr_rnd)
         print(
             f"L2 norm between the fully disordered and ordered state:\t {ord2disord_dist}")
         print('\n========================================\n')
+        if args.fit_ordered_only:
+            sys.exit("Flag to find ordered state only detected. Exiting...")
         print('Starting T optimisation...\n')
     else:
+        if args.fit_ordered_only:
+
+            print("Flag to find ordered state only detected.")
+            options = {'disp': bool(args.verbose),
+                       'maxiter': args.maxiter,
+                       'tol': args.xtol,
+                      }
+
+            print('Calculating Ordered Correlation....')
+            result_ord = opt.find_ordered(cluster_data=clusters_full,
+                                          corr=corr_rnd,
+                                          method=args.linprog_method,
+                                          options=options
+                                         )
+            corr_ord = result_ord.x
+            print(f"Ordered correlation\t: {corr_ord}")
+            sys.exit('Exiting...')
+
         print("Norm Constraint not activated.\n")
         print("Turning off SRO fit flag since constraint is not activated.\n")
         args.skip_sro_fit = True
@@ -465,7 +485,8 @@ if __name__ == '__main__':
                   clusters_full.vmat,
                   clusters_full.kb,
                   clusters_full.clusters,
-                  clusters_full.configcoef,
+                  clusters_full.clustermult,
+                  clusters_full.configmult,
                   T,
                   clusters_full.eci)
         print(f"Disordered CVM energy @ T = {T}K\t: {F_rnd:.4f}")
@@ -532,7 +553,7 @@ if __name__ == '__main__':
                                 args.out,
                                 args.coeff_in,
                                 args.skip_expo,
-                                args.method,
+                                args.sro_method,
                                 args.verbose
                                 )
 

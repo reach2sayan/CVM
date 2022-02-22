@@ -1,0 +1,82 @@
+#!/usr/bin/python3
+import argparse
+import os
+import sys
+from pathlib import Path
+
+import numpy as np
+import optimiser as opt
+import subprocess
+
+from clusterdata import ClusterInfo
+
+if __name__ == '__main__':
+
+    structure = os.getcwd()
+    path = Path(structure)
+    phase = str(path.parent.absolute())
+
+    parser = argparse.ArgumentParser('Ordered Correlation Calculator',
+                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+                                     )
+    parser.add_argument('-corrs', default='correlations.in',
+                        help='structure file (used to asses point correlations if kept fixed)')
+    parser.add_argument('--clusmult', '-cm',
+                        default='clusmult.out',
+                        help='File containing cluster multipcities'
+                        )
+    parser.add_argument('--vmat', '-v',
+                        default='vmat.out',
+                        help='File containing vmatrix'
+                        )
+    parser.add_argument('--clusters', '-cl',
+                        default='clusters.out',
+                        help='File containing cluster multipcities'
+                        )
+    parser.add_argument('--eci', '-e',
+                        default='eci.out',
+                        help='File containing ECIs'
+                        )
+    parser.add_argument('--tol', '-t',
+                        type=float,
+                        default=1e-18,
+                        help='Tolerance'
+                        )
+    parser.add_argument('--fix_point', '-fp',
+                        action='store_true',
+                        default=True,
+                        help='Flag to enable fixed point correlations'
+                        )
+    parser.add_argument('--display', '-d',
+                        action='store_true',
+                        default=True,
+                        help='Vrebosity'
+                        )
+    args = parser.parse_args()
+
+    cluster = ClusterInfo(clusters_fname=args.clusters,
+                          eci_fname=args.eci,
+                          kb_fname=None,
+                          clustermult_fname=args.clusmult,
+                          configmult_fname=None,
+                          config_fname=None,
+                          vmat_fname=args.vmat,
+                          )
+
+    options = {'disp': True,
+               'tol': args.tol,
+               }
+    try:
+        corr = np.loadtxt(args.corrs)
+    except FileNotFoundError:
+        corr = None
+        args.fix_point = False
+
+    result = opt.find_ordered(cluster_data=cluster,
+                              corr=corr,
+                              method='revised simplex',
+                              options=options,
+                              fix_point=args.fix_point
+                              )
+    corr_ord = result.x
+    print(f"Ordered correlation\t: {corr_ord}")

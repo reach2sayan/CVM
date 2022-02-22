@@ -32,9 +32,7 @@ def create_structure(label, ps):
                     rnd_index2 = random.randint(0, len(positions)-1)
 
                     if positions[rnd_index1][3] != positions[rnd_index2][3]:
-                        tmp = positions[rnd_index1][3]
-                        positions[rnd_index1][3] = positions[rnd_index2][3]
-                        positions[rnd_index2][3] = tmp
+                        positions[rnd_index1][3], positions[rnd_index2][3] = positions[rnd_index2][3], positions[rnd_index1][3]
                         break
 
             with open(f'{cwd}/{label}/{structure}', 'w') as flabel:
