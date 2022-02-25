@@ -70,7 +70,8 @@ def fit(F,
         approx_deriv=True,
         init_random=False,
         init_disordered=True,
-        seed=42
+        seed=42,
+        early_stopping_cond=np.inf
         ):
     """
     Functions takes in all required inputs :
@@ -87,7 +88,8 @@ def fit(F,
         jac = '3-point'
         hess = BFGS()
 
-    for _ in range(NUM_TRIALS):
+    steps_b4_mini = 0
+    for trial in range(NUM_TRIALS):
         if init_random:
             corrs_attempt = np.array([1, *[corrs_trial[1]]*len(cluster_data.single_point_clusters),
                                       *rng.uniform(-1, 1, cluster_data.num_clusters - len(cluster_data.single_point_clusters) - 1)
@@ -101,7 +103,7 @@ def fit(F,
                               )
             corrs_attempt = corrs_trial+jitter
 
-        print(f'{_} : {corrs_attempt}',)
+        print(f'{trial} : {corrs_attempt}',)
         temp_results = minimize(F,
                                 corrs_attempt,
                                 method='trust-constr',
@@ -120,6 +122,7 @@ def fit(F,
                                 )
 
         if temp_results.fun < result_value:
+            steps_b4_mini = 0
             result = temp_results
             result_value = temp_results.fun
             if display_inter:
@@ -129,5 +132,11 @@ def fit(F,
                 print(
                     f"Stop Status: {temp_results.status} | {temp_results.message}")
                 print('\n====================================\n')
+        else:
+            steps_b4_mini += 1
+
+        if trial > NUM_TRIALS/2 and steps_b4_mini > early_stopping_cond:
+            print(f'No improvement for {early_stopping_cond} steps. After half of max steps ({NUM_TRIALS}) were done.')
+            break
 
     return result

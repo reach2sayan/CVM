@@ -209,6 +209,11 @@ if __name__ == '__main__':
                             type=int,
                             help="Indicate maximum iterations for the local optimiser ",
                             )
+    opt_params.add_argument('--earlystop',
+                            default=np.inf,
+                            type=int,
+                            help="Number of steps to break out of trials if no new minima has been found.",
+                           )
     opt_params.add_argument('--xtol',
                             default=1e-18,
                             type=float,
@@ -519,7 +524,8 @@ if __name__ == '__main__':
                          constraints=constraints_sro,
                          corrs_trial=corr_rnd,
                          display_inter=True,
-                         seed=args.seed
+                         seed=args.seed,
+                         early_stopping_cond=args.earlystop
                          )
         F_cvm = result.fun
         print(f"Optimised CVM energy @ T = {T}K\t: {F_cvm:.4f}")
