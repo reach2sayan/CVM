@@ -32,27 +32,16 @@ class ClusterInfo:
                  configmult_fname=None,
                  config_fname=None,
                  vmat_fname=None,
-                 cluster_only=False):
+                ):
 
-        if cluster_only:
-            print(
-                'Creating an Object with cluster and ECI only. Not suitable for CVM.')
-            self.clusters = ClusterInfo.read_clusters(clusters_fname)
-            self.kb = None
-            self.configmult = None
-            self.clustermult = None
-            self.configs = None
-            self.vmat = None
-            self.eci = {idx: 0.0 for idx in self.clusters}
-        else:
-            self.clusters = ClusterInfo.read_clusters(clusters_fname)
-            self.kb = ClusterInfo.read_kbcoeffs(kb_fname)
-            self.configmult = ClusterInfo.read_configmult(configmult_fname)
-            self.clustermult = ClusterInfo.read_clustermult(
-                clustermult_fname, len(self.clusters))
-            self.configs = ClusterInfo.read_configs(config_fname)
-            self.vmat = ClusterInfo.read_vmatrix(vmat_fname)
-            self.eci = ClusterInfo.read_eci(eci_fname, len(self.clusters))
+        self.clusters = ClusterInfo.read_clusters(clusters_fname)
+        self.kb = ClusterInfo.read_kbcoeffs(kb_fname)
+        self.configmult = ClusterInfo.read_configmult(configmult_fname)
+        self.clustermult = ClusterInfo.read_clustermult(
+            clustermult_fname, len(self.clusters))
+        self.configs = ClusterInfo.read_configs(config_fname)
+        self.vmat = ClusterInfo.read_vmatrix(vmat_fname)
+        self.eci = ClusterInfo.read_eci(eci_fname, len(self.clusters))
 
     def get_rho(self, corrs):
 
@@ -63,19 +52,20 @@ class ClusterInfo:
 
     def __repr__(self):
 
-        print("ECI:")
-        print(self.eci)
-        print("KB:")
-        print(self.kb)
-        print("Vmatrix")
-        print(self.vmat)
         print("Clusters:")
-        print(self.clusters)
-        print("Config Multiplicities:")
-        print(self.configmult)
-        print("Cluster Multiplicities:")
-        print(self.clustermult)
+        print("{0:<19s}|{1:<19s}|{2:<19s}|{3:<19s}".format("Index","Type", "Multiplicity","Radius"))
+        for idx, cluster in self.clusters.items():
+            assert self.clustermult[idx] == cluster['mult']
+            print("{0:<19d}|{1:<19d}|{2:<19d}|{3:<19.5f}".format(idx, cluster['type'], cluster['mult'], cluster['length']))
+
+        print("\nConfigs:")
+        print("{0:<19s}|{1:<19s}".format("Index","No. of subconfigs"))
+        for idx, config in self.configs.items():
+            assert len(self.configmult[idx]) == config['num_of_subclus']
+            print("{0:<19d}|{1:<19d}".format(idx, config['num_of_subclus'],))
+
         return ''
+
 
     @property
     def num_configs(self):
@@ -261,9 +251,14 @@ class ClusterInfo:
                 if eci_val == '':
                     continue
                 eci[idx] = float(eci_val)
-        except FileNotFoundError:
-            print(
-                f"No pre-existing {eci_fname.split('/')[-1]} file found. Instantiating with all zeros")
+        except (FileNotFoundError, TypeError):
+            if eci_fname is not None:
+                print(
+                    f"No pre-existing {eci_fname.split('/')[-1]} file found. Instantiating with all zeros")
+            else:
+                print(
+                    f"Instantiating ECI with all zeros")
+
             temp_eci = np.array([0]*numclus)
 
             for idx, eci_val in enumerate(temp_eci):

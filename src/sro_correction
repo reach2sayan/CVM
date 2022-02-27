@@ -267,9 +267,7 @@ if __name__ == '__main__':
     # To generate data for ECI fitting
     if args.make_substructures_only:
         print('Flag to create substructures only found.')
-        clfit = ClusterInfo(clusters_fname=f'{structure}/clusters_fit.out',
-                            cluster_only=True
-                            )
+        clfit = ClusterInfo(clusters_fname=f'{structure}/clusters_fit.out',)
         print(
             f'Found {clfit.num_clusters} no. of clusters to fit. Creating double as many structures...')
         ref_list = open('references.in', 'w')
@@ -326,7 +324,6 @@ if __name__ == '__main__':
                                 config_fname=f'{structure}/{args.config}',
                                 vmat_fname=f'{structure}/{args.vmat}',
                                 eci_fname=f'{structure}/{args.eci}',
-                                cluster_only=False
                                 )
 
     # This section of the code either chooses to skip fitting ECIs
@@ -349,7 +346,7 @@ if __name__ == '__main__':
             sys.exit(1)
 
         clusters_fit = ClusterInfo(
-            args.clusters_fit, None, None, None, None, None, cluster_only=True)
+            args.clusters_fit, None, None, None, None, None,)
 
         for struc in reference_structures:
             try:
@@ -524,6 +521,7 @@ if __name__ == '__main__':
                          constraints=constraints_sro,
                          corrs_trial=corr_rnd,
                          display_inter=True,
+                         approx_deriv=False,
                          seed=args.seed,
                          early_stopping_cond=args.earlystop
                          )
