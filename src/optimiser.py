@@ -6,9 +6,10 @@ import numpy as np
 from scipy.optimize import minimize
 from scipy.optimize import BFGS
 from scipy.optimize import linprog
+import itertools
 
 
-def find_ordered(cluster_data, corr, method, options, no_fix_point=False, print_output=True,):
+def find_ordered(cluster_data, corr, method, options, fix_point=True, print_output=True,):
     """
     Finds the ordered structure given cluster information using Linear Programming
     Input:
@@ -22,14 +23,15 @@ def find_ordered(cluster_data, corr, method, options, no_fix_point=False, print_
 
     all_vmat = -1 * np.vstack([vmat for vmat in cluster_data.vmat.values()])
     vmat_limit = np.zeros(all_vmat.shape[0])
-    if not no_fix_point:
+    if fix_point:
         corr_bounds = [(corr[idx], corr[idx]) if cluster['type'] == 1 else (
             1, 1) if cluster['type'] == 0 else (-1, 1) for idx, cluster in cluster_data.clusters.items()]
     else:
         if cluster_data.clusters is None:
             corr_bounds = [(-1, 1) for _ in cluster_data.eci]
         else:
-            corr_bounds = [(1, 1) if cluster['type'] == 0 else (-1, 1) for idx, cluster in cluster_data.clusters.items()]
+            corr_bounds = [(1, 1) if cluster['type'] == 0 else (-1, 1)
+                           for idx, cluster in cluster_data.clusters.items()]
 
     ecis = np.array(list(cluster_data.eci.values())),
     mults = np.array(list(cluster_data.clustermult.values()))
@@ -45,8 +47,8 @@ def find_ordered(cluster_data, corr, method, options, no_fix_point=False, print_
     if result.success:
         print('Ordered State calculations completed...')
         if print_output:
-            np.savetxt('ordered_correlations.out',result.x)
-            with open('ordered_rho.out','w') as frho:
+            np.savetxt('ordered_correlations.out', result.x)
+            with open('ordered_rho.out', 'w') as frho:
                 for vmat in cluster_data.vmat.values():
                     frho.write(f'{" ".join(map(str,vmat@result.x))}\n')
 
@@ -55,7 +57,8 @@ def find_ordered(cluster_data, corr, method, options, no_fix_point=False, print_
         f'WARNING: linear programming for ordered correlation search failed: {result.status} - {result.message}\nExiting...')
     return result
 
-
+rhologrho = lambda rho: rho * np.log(np.abs(rho))
+vect_rhologrho = np.vectorize(rhologrho)
 def fit(F,
         cluster_data,
         temp,
@@ -84,6 +87,16 @@ def fit(F,
     rng = np.random.default_rng(seed)
     result = None
     result_value = 1e5
+
+    all_vmat = np.vstack([vmat for vmat in cluster_data.vmat.values()])
+    mults_eci = np.multiply(np.array(list(cluster_data.clustermult.values())),
+                            np.array(list(cluster_data.eci.values()))
+                           )
+    multconfig_kb = np.multiply(np.array(list(itertools.chain.from_iterable(list(cluster_data.configmult.values())))), #mults_config
+                                np.array(list(itertools.chain.from_iterable([[kb for _ in range(len(cluster_data.configmult[idx]))] for idx, kb in cluster_data.kb.items()]))) #al_kb
+                               )
+
+
     if approx_deriv:
         print('Approximating the derivatives - Jacobian : a 3-point finite diffrence scheme, Hessian : BFGS')
         jac = '3-point'
@@ -107,17 +120,17 @@ def fit(F,
                               )
             corrs_attempt = corrs_trial+jitter
 
-        #print(f'{trial} : {corrs_attempt}',)
+        #print(f'{trial} : {corrs_attempt}',end='\r')
         temp_results = minimize(F,
                                 corrs_attempt,
                                 method='trust-constr',
-                                args=(cluster_data.vmat,
-                                      cluster_data.kb,
-                                      cluster_data.clusters,
-                                      cluster_data.clustermult,
-                                      cluster_data.configmult,
-                                      temp,
-                                      cluster_data.eci),
+                                args=(
+                                    mults_eci,
+                                    multconfig_kb,
+                                    all_vmat,
+                                    vect_rhologrho,
+                                    temp,
+                                ),
                                 options=options,
                                 jac=jac,
                                 hess=hess,
@@ -140,7 +153,8 @@ def fit(F,
             steps_b4_mini += 1
 
         if trial > NUM_TRIALS/2 and steps_b4_mini > early_stopping_cond:
-            print(f'No improvement for {early_stopping_cond} steps. After half of max steps ({NUM_TRIALS}) were done.')
+            print(
+                f'No improvement for {early_stopping_cond} steps. After half of max steps ({NUM_TRIALS}) were done.')
             break
 
     return result
