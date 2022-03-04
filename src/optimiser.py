@@ -98,8 +98,12 @@ def fit(F,
 
 
     if approx_deriv:
+        print('Approximating the derivatives - Jacobian : a 3-point finite diffrence scheme, Hessian : BFGS')
         jac = '3-point'
         hess = BFGS()
+    else:
+        print('Using Analytical gradients and hessian...')
+
 
     steps_b4_mini = 0
     for trial in range(NUM_TRIALS):
