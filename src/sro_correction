@@ -550,7 +550,9 @@ if __name__ == '__main__':
     print('Finished Optimising for SRO correction')
 
     # This section has the same code as above. But does the fit following a full optimisation
-    if not args.skip_sro_fit:
+    if args.skip_sro_fit:
+        print('Flag to skip SRO correction fitting as a function of T.')
+    else:
         print('Fitting SRO corrections to a function of T')
         best_params = sro_T_fit(sro_T,
                                 args.degree,
@@ -569,4 +571,3 @@ if __name__ == '__main__':
             bestC = best_params['C']
             fout.write(f'{bestC},0')
     else:
-        print('Flag to skip SRO correction fitting as a function of T.')
