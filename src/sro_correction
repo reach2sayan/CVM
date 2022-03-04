@@ -18,7 +18,7 @@ import scipy as sp
 import optimiser as opt
 from constraints import Constraints
 from bounds import CorrBounds
-from energyfunctions import F, F_jacobian, F_hessian, sro_T
+from energyfunctions import F, F_efficient, F_jacobian, F_jacobian_efficient, F_hessian_efficient, F_hessian, sro_T
 from fit_eci import fit_eci_scipy, fit_eci_lsfit, fit_eci_ransac
 from clusterdata import ClusterInfo
 from logger import Logger
@@ -330,6 +330,7 @@ if __name__ == '__main__':
     # Or go ahead, read from substructures to do the ECI fit
     if args.skip_eci_fitting:
         print(f"Skipping ECI fitting step. Using {args.eci} instead")
+        print(clusters_full.eci)
     else:
         print('\n===================================================\n')
         print(
@@ -498,7 +499,6 @@ if __name__ == '__main__':
             constraints_sro = constraints.get_constraints_sro(
                 ord2disord_dist, corr_rnd)
         else:
-            # similar to ordered since we do not add the norm constraint
             constraints_sro = constraints.get_constraints_ordered(corr_rnd)
 
         bounds_sro = bounds.get_sro_bounds(FIXED_CORRS)
@@ -510,18 +510,18 @@ if __name__ == '__main__':
                    'initial_constr_penalty': 10
                    }
 
-        result = opt.fit(F=F,
+        result = opt.fit(F=F_efficient,
                          cluster_data=clusters_full,
                          temp=T,
                          options=options,
-                         jac=F_jacobian,
-                         hess=F_hessian,
+                         jac=F_jacobian_efficient,
+                         hess=F_hessian_efficient,
                          NUM_TRIALS=args.global_trials,
                          bounds=bounds_sro,
                          constraints=constraints_sro,
                          corrs_trial=corr_rnd,
                          display_inter=True,
-                         approx_deriv=False,
+                         approx_deriv=True,
                          seed=args.seed,
                          early_stopping_cond=args.earlystop
                          )
@@ -547,9 +547,6 @@ if __name__ == '__main__':
         with open(args.out, 'w') as fout:
             json.dump(results_sro, fout)
 
-    np.savetxt(f"{args.out.replace('json','out')}",results_sro[corrcols].values)
-    e_corrected = results_sro['F_cvm'].values - results_sro['rnd'].values
-    np.savetxt(f"{args.out.replace('json','energy_corrected')}", e_corrected)
     print('Finished Optimising for SRO correction')
 
     # This section has the same code as above. But does the fit following a full optimisation
