@@ -80,7 +80,6 @@ dmypy.json
 *.temp
 *.out
 *.log
-*.ipynb
 *.png
 *.gif
 *.json
