@@ -57,8 +57,6 @@ def find_ordered(cluster_data, corr, method, options, fix_point=True, print_outp
         f'WARNING: linear programming for ordered correlation search failed: {result.status} - {result.message}\nExiting...')
     return result
 
-rhologrho = lambda rho: rho * np.log(np.abs(rho))
-vect_rhologrho = np.vectorize(rhologrho)
 def fit(F,
         cluster_data,
         temp,
@@ -87,15 +85,18 @@ def fit(F,
     rng = np.random.default_rng(seed)
     result = None
     result_value = 1e5
+    mult_arr = np.array(list(cluster_data.clustermult.values()))
+    eci_arr = np.array(list(cluster_data.eci.values()))
 
     all_vmat = np.vstack([vmat for vmat in cluster_data.vmat.values()])
-    mults_eci = np.multiply(np.array(list(cluster_data.clustermult.values())),
-                            np.array(list(cluster_data.eci.values()))
-                           )
-    multconfig_kb = np.multiply(np.array(list(itertools.chain.from_iterable(list(cluster_data.configmult.values())))), #mults_config
-                                np.array(list(itertools.chain.from_iterable([[kb for _ in range(len(cluster_data.configmult[idx]))] for idx, kb in cluster_data.kb.items()]))) #al_kb
-                               )
+    mults_config = np.asarray(list(itertools.chain.from_iterable(list(cluster_data.configmult.values()))))
+    mults_eci = np.multiply(mult_arr,eci_arr)
+    all_kb = np.array(list(itertools.chain.from_iterable([[kb for _ in range(len(cluster_data.configmult[idx]))] for idx, kb in cluster_data.kb.items()])))
 
+    multconfig_kb = np.multiply(mults_config,all_kb)
+
+    rhologrho = lambda rho: rho * np.log(np.abs(rho))
+    vrhologrho = np.vectorize(rhologrho)
 
     if approx_deriv:
         print('Approximating the derivatives - Jacobian : a 3-point finite diffrence scheme, Hessian : BFGS')
@@ -128,7 +129,7 @@ def fit(F,
                                     mults_eci,
                                     multconfig_kb,
                                     all_vmat,
-                                    vect_rhologrho,
+                                    vrhologrho,
                                     temp,
                                 ),
                                 options=options,
