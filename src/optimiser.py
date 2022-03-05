@@ -80,19 +80,22 @@ def fit(F,
         1. Functions and derivatives (if available),
         2. tolerances,
         3. bounds and constraints,
+        4. Cluster Information
         4. Other fitting parameters
     and returns the minimised set of values for the particular section of the CVM correction pipeline.
     """
     rng = np.random.default_rng(seed)
     result = None
     result_value = 1e5
+
     mult_arr = np.array(list(cluster_data.clustermult.values()))
     eci_arr = np.array(list(cluster_data.eci.values()))
+
+    mults_eci = np.multiply(mult_arr, eci_arr)
 
     all_vmat = np.vstack([vmat for vmat in cluster_data.vmat.values()])
     mults_config = np.array(
         list(itertools.chain.from_iterable(list(cluster_data.configmult.values()))))
-    mults_eci = np.multiply(mult_arr, eci_arr)
     all_kb = np.array(list(itertools.chain.from_iterable([[kb for _ in range(
         len(cluster_data.configmult[idx]))] for idx, kb in cluster_data.kb.items()])))
 
@@ -102,11 +105,8 @@ def fit(F,
     vrhologrho = np.vectorize(rhologrho)
 
     if approx_deriv:
-        print('Approximating the derivatives - Jacobian : a 3-point finite diffrence scheme, Hessian : BFGS')
         jac = '3-point'
         hess = BFGS()
-    else:
-        print('Using Analytical gradients and hessian...')
 
     steps_b4_mini = 0
     for trial in range(NUM_TRIALS):
@@ -123,7 +123,6 @@ def fit(F,
                               )
             corrs_attempt = corrs_trial+jitter
 
-        #print(f'{trial} : {corrs_attempt}',end='\r')
         temp_results = minimize(F,
                                 corrs_attempt,
                                 method='trust-constr',
@@ -142,9 +141,17 @@ def fit(F,
                                 )
 
         if temp_results.fun < result_value:
+            try:
+                assert not np.all(np.isnan(temp_results))
+                assert temp_results.status != 0
+            except AssertionError:
+                print('Gradient blew up!! Incorrect solution. Moving on...')
+                continue
+
             steps_b4_mini = 0
             result = temp_results
             result_value = temp_results.fun
+
             if display_inter:
                 print(f'Current Energy: {temp_results.fun}')
                 print(f'Current minimum correlations: {temp_results.x}')

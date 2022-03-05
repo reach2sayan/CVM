@@ -18,7 +18,7 @@ import scipy as sp
 import optimiser as opt
 from constraints import Constraints
 from bounds import CorrBounds
-from energyfunctions import F, F_efficient, F_jacobian, F_jacobian_efficient, F_hessian_efficient, F_hessian, sro_T
+from energyfunctions import *
 from fit_eci import fit_eci_scipy, fit_eci_lsfit, fit_eci_ransac
 from clusterdata import ClusterInfo
 from logger import Logger
@@ -483,6 +483,11 @@ if __name__ == '__main__':
         print("Turning off SRO fit flag since constraint is not activated.\n")
         args.skip_sro_fit = True
         print('Starting T optimisation...\n')
+        if args.approx_deriv:
+            print('Approximating the derivatives - Jacobian : a 3-point finite diffrence scheme, Hessian : BFGS')
+        else:
+            print('Using Analytical gradients and hessian...')
+
     # End of the calcualting ordered correlations
 
     for T in custom_linspace(start=args.Tmin, stop=args.Tmax, step=args.Tstep):
