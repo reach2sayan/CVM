@@ -204,6 +204,11 @@ if __name__ == '__main__':
     opt_params.add_argument('--verbose', '-v', action='count', default=0,
                             help="Indicate the verbosity of the fit ",
                             )
+    opt_params.add_argument('--approx_deriv',
+                            action='store_true',
+                            default=False,
+                            help="Flag to enable estimation of derivatives",
+                           )
     opt_params.add_argument('--maxiter',
                             default=5000,
                             type=int,
@@ -521,7 +526,7 @@ if __name__ == '__main__':
                          constraints=constraints_sro,
                          corrs_trial=corr_rnd,
                          display_inter=True,
-                         approx_deriv=True,
+                         approx_deriv=args.approx_deriv,
                          seed=args.seed,
                          early_stopping_cond=args.earlystop
                          )
@@ -570,4 +575,3 @@ if __name__ == '__main__':
                 fout.write(f'{c},{e}\n')
             bestC = best_params['C']
             fout.write(f'{bestC},0')
-    else:

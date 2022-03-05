@@ -57,6 +57,7 @@ def find_ordered(cluster_data, corr, method, options, fix_point=True, print_outp
         f'WARNING: linear programming for ordered correlation search failed: {result.status} - {result.message}\nExiting...')
     return result
 
+
 def fit(F,
         cluster_data,
         temp,
@@ -89,13 +90,15 @@ def fit(F,
     eci_arr = np.array(list(cluster_data.eci.values()))
 
     all_vmat = np.vstack([vmat for vmat in cluster_data.vmat.values()])
-    mults_config = np.asarray(list(itertools.chain.from_iterable(list(cluster_data.configmult.values()))))
-    mults_eci = np.multiply(mult_arr,eci_arr)
-    all_kb = np.array(list(itertools.chain.from_iterable([[kb for _ in range(len(cluster_data.configmult[idx]))] for idx, kb in cluster_data.kb.items()])))
+    mults_config = np.array(
+        list(itertools.chain.from_iterable(list(cluster_data.configmult.values()))))
+    mults_eci = np.multiply(mult_arr, eci_arr)
+    all_kb = np.array(list(itertools.chain.from_iterable([[kb for _ in range(
+        len(cluster_data.configmult[idx]))] for idx, kb in cluster_data.kb.items()])))
 
-    multconfig_kb = np.multiply(mults_config,all_kb)
+    multconfig_kb = np.multiply(mults_config, all_kb)
 
-    rhologrho = lambda rho: rho * np.log(np.abs(rho))
+    def rhologrho(rho): return rho * np.log(np.abs(rho))
     vrhologrho = np.vectorize(rhologrho)
 
     if approx_deriv:
@@ -104,7 +107,6 @@ def fit(F,
         hess = BFGS()
     else:
         print('Using Analytical gradients and hessian...')
-
 
     steps_b4_mini = 0
     for trial in range(NUM_TRIALS):

@@ -16,12 +16,12 @@ def sro_T(T, **params):
 
     return -np.abs(params['C'])*np.abs(r)
 
-def F_efficient(corrs, mults_eci, multconfig_kb, all_vmat, vect_rhologrho, T):
+def F_efficient(corrs, mults_eci, multconfig_kb, all_vmat, vect_rhologrho, temp):
 
     H = mults_eci @ corrs
     S = multconfig_kb @ vect_rhologrho(all_vmat @ corrs)
 
-    return H + kB*T*S
+    return H + kB*temp*S
 
 
 def F(corrs, vmat, kb, clusters, clustermult, configmult, T, eci):
@@ -115,12 +115,12 @@ def F_jacobian(corrs, vmat, kb, clusters, clustermult, configmult, T, eci):
     return dH + kB*T*dS
 
 
-def F_jacobian_efficient(corrs, mults_eci, multconfig_kb, all_vmat, vect_rhologrho, T):
+def F_jacobian_efficient(corrs, mults_eci, multconfig_kb, all_vmat, vect_rhologrho, temp):
 
     dH = mults_eci
-    dS = all_vmat.T @ (multconfig_kb * (1 + np.log(all_vmat @ corrs)))
+    dS = all_vmat.T @ (multconfig_kb * (1 + np.log(np.abs(all_vmat @ corrs))))
 
-    return dH + kB*T*dS
+    return dH + kB*temp*dS
 
 
 def F_hessian(corrs, vmat, kb, clusters, clustermult, configmult, T, eci):
@@ -179,9 +179,7 @@ def F_hessian(corrs, vmat, kb, clusters, clustermult, configmult, T, eci):
 
     return kB*T*d2F
 
-def F_hessian_efficient(corrs, mults_eci, multconfig_kb, all_vmat, vect_rhologrho, T):
+def F_hessian_efficient(corrs, mults_eci, multconfig_kb, all_vmat, vect_rhologrho, temp):
 
-    t_0 = all_vmat @ corrs
-    d2S = ((multconfig_kb / t_0)[:, np.newaxis] * all_vmat).T @ all_vmat
-
-    return kB*T*d2S
+    d2S = ((multconfig_kb / (all_vmat @ corrs))[:, np.newaxis] * all_vmat).T @ all_vmat
+    return kB*temp*d2S
