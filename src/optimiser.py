@@ -91,7 +91,7 @@ def fit(F,
     mult_arr = np.array(list(cluster_data.clustermult.values()))
     eci_arr = np.array(list(cluster_data.eci.values()))
 
-    mults_eci = np.multiply(mult_arr, eci_arr)
+    mults_eci = mult_arr * eci_arr
 
     all_vmat = np.vstack([vmat for vmat in cluster_data.vmat.values()])
     mults_config = np.array(
@@ -99,10 +99,11 @@ def fit(F,
     all_kb = np.array(list(itertools.chain.from_iterable([[kb for _ in range(
         len(cluster_data.configmult[idx]))] for idx, kb in cluster_data.kb.items()])))
 
-    multconfig_kb = np.multiply(mults_config, all_kb)
+    multconfig_kb = mults_config * all_kb
 
-    def rhologrho(rho): return rho * np.log(np.abs(rho))
-    vrhologrho = np.vectorize(rhologrho)
+    assert all_vmat.shape == (len(multconfig_kb), len(mults_eci))
+
+    vrhologrho = np.vectorize(lambda rho: rho * np.log(np.abs(rho)))
 
     if approx_deriv:
         jac = '3-point'
