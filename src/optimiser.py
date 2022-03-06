@@ -142,7 +142,7 @@ def fit(F,
 
         if temp_results.fun < result_value:
             try:
-                assert not np.all(np.isnan(temp_results))
+                assert not np.all(np.isnan(temp_results.grad))
                 assert temp_results.status != 0
             except AssertionError:
                 print('Gradient blew up!! Incorrect solution. Moving on...')
