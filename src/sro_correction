@@ -502,6 +502,17 @@ if __name__ == '__main__':
                   clusters_full.configmult,
                   T,
                   clusters_full.eci)
+        if args.no_constraint:
+            F_ord = F(corr_ord,
+                      clusters_full.vmat,
+                      clusters_full.kb,
+                      clusters_full.clusters,
+                      clusters_full.clustermult,
+                      clusters_full.configmult,
+                      T,
+                      clusters_full.eci)
+            print(f"Ordered CVM energy @ T = {T}K\t: {F_ord:.4f}")
+            print(f"Ordered Correlations @ T = {T}K\t: {corr_ord}")
         print(f"Disordered CVM energy @ T = {T}K\t: {F_rnd:.4f}")
         print(f"Disordered Correlations @ T = {T}K\t: {corr_rnd}")
 
@@ -542,14 +553,26 @@ if __name__ == '__main__':
         print(f"Optimised Correlation @ T = {T}K\t: {result.x}")
         print("\n#################################################")
         F_solid_solution = F_sqs + F_cvm - F_rnd
-        results_sro.append({'structure': structure.split('/')[-1],
-                            'temperature': T,
-                            'corrs': list(result.x),
-                            'F_sqs': F_sqs,
-                            'F_rnd': F_rnd,
-                            'F_cvm': F_cvm
-                            }
-                           )
+        if args.no_constraint:
+            results_sro.append({'structure': structure.split('/')[-1],
+                                'temperature': T,
+                                'corrs': list(result.x),
+                                'F_sqs': F_sqs,
+                                'F_rnd': F_rnd,
+                                'F_cvm': F_cvm,
+                               }
+                              )
+        else:
+            results_sro.append({'structure': structure.split('/')[-1],
+                                'temperature': T,
+                                'corrs': list(result.x),
+                                'F_sqs': F_sqs,
+                                'F_rnd': F_rnd,
+                                'F_ord': F_ord,
+                                'F_cvm': F_cvm,
+                                'distance': ord2disord_dist - np.linalg.norm(result.x - corr_rnd)
+                                }
+                               )
 
         corrcols = [f'corr {i}' for i in range(clusters_full.num_clusters)]
         for item in results_sro:
