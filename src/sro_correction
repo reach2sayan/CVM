@@ -453,6 +453,7 @@ if __name__ == '__main__':
                                      )
         corr_ord = result_ord.x
         print(f"Ordered correlation\t: {corr_ord}")
+        print(f"Ordered Energy\t: {result_ord.fun}") 
         ord2disord_dist = np.linalg.norm(corr_ord - corr_rnd)
         print(
             f"L2 norm between the fully disordered and ordered state:\t {ord2disord_dist}")

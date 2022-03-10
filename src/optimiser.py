@@ -35,7 +35,7 @@ def find_ordered(cluster_data, corr, method, options, fix_point=True, print_outp
 
     ecis = np.array(list(cluster_data.eci.values())),
     mults = np.array(list(cluster_data.clustermult.values()))
-    obj = ecis*mults
+    obj = ecis * mults
 
     result = linprog(obj,
                      A_ub=all_vmat,
@@ -111,7 +111,7 @@ def fit(F,
 
     steps_b4_mini = 0
     trial = 0
-    while trial < NUM_TRIALS:  #al in range(NUM_TRIALS):
+    while trial < NUM_TRIALS:  # al in range(NUM_TRIALS):
         if init_random:
             corrs_attempt = np.array([1, *[corrs_trial[1]]*len(cluster_data.single_point_clusters),
                                       *rng.uniform(-1, 1, cluster_data.num_clusters - len(cluster_data.single_point_clusters) - 1)
