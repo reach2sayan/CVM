@@ -502,7 +502,7 @@ if __name__ == '__main__':
                   clusters_full.configmult,
                   T,
                   clusters_full.eci)
-        if args.no_constraint:
+        if not args.no_constraint:
             F_ord = F(corr_ord,
                       clusters_full.vmat,
                       clusters_full.kb,
@@ -518,7 +518,7 @@ if __name__ == '__main__':
 
         if not args.no_constraint:
             constraints_sro = constraints.get_constraints_sro(
-                corr_ord, corr_rnd)
+                ord2disord_dist, corr_rnd)
         else:
             constraints_sro = constraints.get_constraints_ordered(corr_rnd)
 
