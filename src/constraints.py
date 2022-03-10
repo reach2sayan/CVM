@@ -3,6 +3,7 @@ Constrain the constraints class defining the different constrains
 """
 import numpy as np
 from scipy.optimize import LinearConstraint
+from scipy.optimize import BFGS
 
 
 class Constraints:
@@ -77,6 +78,8 @@ class Constraints:
                             'type': 'eq'
                             },
                            {'fun': lambda corrs: ord2disord_dist/2 - np.linalg.norm(corrs-corr_rnd),
+                            'jac':'3-point',
+                            'hess':BFGS(),
                             'type': 'ineq'
                             }
                            ]

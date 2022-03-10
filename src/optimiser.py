@@ -110,7 +110,8 @@ def fit(F,
         hess = BFGS()
 
     steps_b4_mini = 0
-    for trial in range(NUM_TRIALS):
+    trial = 0
+    while trial < NUM_TRIALS:  #al in range(NUM_TRIALS):
         if init_random:
             corrs_attempt = np.array([1, *[corrs_trial[1]]*len(cluster_data.single_point_clusters),
                                       *rng.uniform(-1, 1, cluster_data.num_clusters - len(cluster_data.single_point_clusters) - 1)
@@ -144,10 +145,14 @@ def fit(F,
         if temp_results.fun < result_value:
             try:
                 assert not np.all(np.isnan(temp_results.grad))
-                assert temp_results.status != 0
             except AssertionError:
                 print('Gradient blew up!! Incorrect solution. Moving on...')
+                trial -= 1
                 continue
+            try:
+                assert temp_results.status != 0
+            except AssertionError:
+                print(f'{temp_results.status}')
 
             steps_b4_mini = 0
             result = temp_results
@@ -167,5 +172,6 @@ def fit(F,
             print(
                 f'No improvement for {early_stopping_cond} steps. After half of max steps ({NUM_TRIALS}) were done.')
             break
+        trial += 1
 
     return result

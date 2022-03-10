@@ -34,6 +34,7 @@ def F_hessian_efficient(corrs, mults_eci, multconfig_kb, all_vmat, vect_rhologrh
 
     #d2S = ((multconfig_kb / (all_vmat @ corrs))[:, np.newaxis] * all_vmat).T @ all_vmat
     d2S = (np.diag(multconfig_kb / (all_vmat @ corrs)).T @ all_vmat).T @ all_vmat
+
     return kB*temp*d2S
 
 def F(corrs, vmat, kb, clusters, clustermult, configmult, T, eci):

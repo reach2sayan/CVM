@@ -220,12 +220,12 @@ if __name__ == '__main__':
                             help="Number of steps to break out of trials if no new minima has been found.",
                            )
     opt_params.add_argument('--xtol',
-                            default=1e-18,
+                            default=1e-12,
                             type=float,
                             help="Indicate the acceptable difference between two iterations ",
                             )
     opt_params.add_argument('--gtol',
-                            default=1e-18,
+                            default=1e-12,
                             type=float,
                             help="Indicate the acceptable violation of constraints ",
                             )
@@ -483,12 +483,12 @@ if __name__ == '__main__':
         print("Turning off SRO fit flag since constraint is not activated.\n")
         args.skip_sro_fit = True
         print('Starting T optimisation...\n')
-        if args.approx_deriv:
-            print('Approximating the derivatives - Jacobian : a 3-point finite diffrence scheme, Hessian : BFGS')
-        else:
-            print('Using Analytical gradients and hessian...')
 
     # End of the calcualting ordered correlations
+    if args.approx_deriv:
+        print('Approximating the derivatives - Jacobian : a 3-point finite diffrence scheme, Hessian : BFGS')
+    else:
+        print('Using Analytical gradients and hessian...')
 
     for T in custom_linspace(start=args.Tmin, stop=args.Tmax, step=args.Tstep):
 
@@ -507,7 +507,7 @@ if __name__ == '__main__':
 
         if not args.no_constraint:
             constraints_sro = constraints.get_constraints_sro(
-                ord2disord_dist, corr_rnd)
+                corr_ord, corr_rnd)
         else:
             constraints_sro = constraints.get_constraints_ordered(corr_rnd)
 
@@ -517,7 +517,7 @@ if __name__ == '__main__':
                    'maxiter': args.maxiter,
                    'xtol': args.xtol,
                    'gtol': args.gtol,
-                   'initial_constr_penalty': 10
+                   'initial_constr_penalty': 1
                    }
 
         result = opt.fit(F=F_efficient,
@@ -532,6 +532,8 @@ if __name__ == '__main__':
                          corrs_trial=corr_rnd,
                          display_inter=True,
                          approx_deriv=args.approx_deriv,
+                         init_random=False,
+                         init_disordered=True,
                          seed=args.seed,
                          early_stopping_cond=args.earlystop
                          )
