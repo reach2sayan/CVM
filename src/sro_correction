@@ -209,6 +209,11 @@ if __name__ == '__main__':
                             default=False,
                             help="Flag to enable estimation of derivatives",
                            )
+    opt_params.add_argument('--no_inter',
+                            action='store_true',
+                            default=False,
+                            help="Flag to enable if intermediate results should be displayed",
+                           )
     opt_params.add_argument('--maxiter',
                             default=5000,
                             type=int,
@@ -542,7 +547,7 @@ if __name__ == '__main__':
                          bounds=bounds_sro,
                          constraints=constraints_sro,
                          corrs_trial=corr_rnd,
-                         display_inter=True,
+                         display_inter= not args.no_inter,
                          approx_deriv=args.approx_deriv,
                          init_random=False,
                          init_disordered=True,
@@ -552,6 +557,8 @@ if __name__ == '__main__':
         F_cvm = result.fun
         print(f"Optimised CVM energy @ T = {T}K\t: {F_cvm:.4f}")
         print(f"Optimised Correlation @ T = {T}K\t: {result.x}")
+        print(f"Optimised Rhos:")
+        clusters_full.print_rho(result.x)
         print("\n#################################################")
         F_solid_solution = F_sqs + F_cvm - F_rnd
         if args.no_constraint:

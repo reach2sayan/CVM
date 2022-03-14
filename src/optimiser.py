@@ -125,7 +125,7 @@ def fit(F,
                               )
             corrs_attempt = corrs_trial+jitter
 
-        print(f'{trial}: {corrs_attempt}')
+        #print(f'{trial}: {corrs_attempt}')
         temp_results = minimize(F,
                                 corrs_attempt,
                                 method='trust-constr',
@@ -153,7 +153,8 @@ def fit(F,
             try:
                 assert temp_results.status != 0
             except AssertionError:
-                print(f'{temp_results.status}')
+                print(f'{temp_results.status} | {temp_results.message}')
+                trial -= 1
 
             steps_b4_mini = 0
             result = temp_results

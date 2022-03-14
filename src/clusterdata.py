@@ -43,11 +43,12 @@ class ClusterInfo:
         self.vmat = ClusterInfo.read_vmatrix(vmat_fname)
         self.eci = ClusterInfo.read_eci(eci_fname, len(self.clusters))
 
-    def get_rho(self, corrs):
+    def print_rho(self, corrs):
 
         for vmat in self.vmat.values():
-            print(f"{' '.join(map(str, vmat @ corrs))}")
-            #print(vmat @ corrs)
+            #print(f"{' '.join(map(str, vmat @ corrs))}")
+            with np.printoptions(precision=3,suppress=True):
+                print(np.array(vmat @ corrs))
         return
 
     def __repr__(self):
