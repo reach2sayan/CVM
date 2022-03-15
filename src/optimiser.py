@@ -125,7 +125,7 @@ def fit(F,
                               )
             corrs_attempt = corrs_trial+jitter
 
-        #print(f'{trial}: {corrs_attempt}')
+        print(f'{trial}: ',end='\r')
         temp_results = minimize(F,
                                 corrs_attempt,
                                 method='trust-constr',
@@ -148,13 +148,11 @@ def fit(F,
                 assert not np.all(np.isnan(temp_results.grad))
             except AssertionError:
                 print('Gradient blew up!! Incorrect solution. Moving on...')
-                trial -= 1
                 continue
             try:
                 assert temp_results.status != 0
             except AssertionError:
                 print(f'{temp_results.status} | {temp_results.message}')
-                trial -= 1
 
             steps_b4_mini = 0
             result = temp_results
