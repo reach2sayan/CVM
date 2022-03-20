@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Code Created By Sayan Samanta and Axel Van de Walle
 """
@@ -359,6 +358,7 @@ if __name__ == '__main__':
         clusters_fit = ClusterInfo(
             args.clusters_fit, None, None, None, None, None,)
 
+
         for struc in reference_structures:
             try:
                 with open(f'{struc}/energy', 'r') as energy_file:
@@ -417,12 +417,16 @@ if __name__ == '__main__':
         sys.exit('Flag to fit only detected. Exiting now...')
     # End ECI fitting
 
-    results_sro = []
-    with open(f'{structure}/energy_atom', 'r') as f:
-        for line in f.readlines():
-            F_sqs = float(line)
-            print(f"Read in SQS energy\t: {F_sqs:.4f}")
+    with open(f'{structure}/energy', 'r') as energy_file:
+      e = float(energy_file.readline())
 
+    num_atoms = sum(1 for line in open(f"{structure}/str.in")) - 6
+    F_sqs = e/num_atoms
+    with open(f'{structure}/energy_atom', 'w') as feperatom:
+      feperatom.write(str(F_sqs))
+      print(f"Read in SQS energy\t: {F_sqs:.4f}")
+
+    results_sro = []
     corr_rnd = subprocess.run(['corrdump', '-c', f'-cf={structure}/{args.clusters}', f'-s={structure}/str.in', f'-l={structure}/{args.lat}', '-rnd'],
                               stdout=subprocess.PIPE,
                               stderr=subprocess.PIPE,

@@ -162,6 +162,7 @@ def fit(F,
                 print(f'Current Energy: {temp_results.fun}')
                 print(f'Current minimum correlations: {temp_results.x}')
                 print(f"Gradient: {np.array2string(temp_results.grad)}")
+                print(f"Constraint Violation: {temp_results.constr_violation}")
                 print(
                     f"Stop Status: {temp_results.status} | {temp_results.message}")
                 print('\n====================================\n')
