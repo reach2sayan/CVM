@@ -233,6 +233,11 @@ if __name__ == '__main__':
                             type=float,
                             help="Indicate the acceptable violation of constraints ",
                             )
+    opt_params.add_argument('--initial_tr_radius',
+                            default=1e-24,
+                            type=float,
+                            help="Initial Trust radius for the optimisation",
+                           )
     opt_params.add_argument('--global_trials',
                             default=50,
                             type=int,
@@ -259,12 +264,12 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    if not args.no_constraint:
-        args.log = f'{args.log}-cons-{date}'
-        args.out = f'{args.out}-cons-{date}'
-    else:
+    if args.no_constraint:
         args.log = f'{args.log}-nocons-{date}'
         args.out = f'{args.out}-nocons-{date}'
+    else:
+        args.log = f'{args.log}-cons-{date}'
+        args.out = f'{args.out}-cons-{date}'
 
     sys.stdout = Logger(sys.stdout, args.log, args.toscreen)
     print(f"Phase: {phase.split('/')[-1]}")
@@ -274,19 +279,19 @@ if __name__ == '__main__':
 
     # This part of the code only makes the subdirectories on which the user to run DFT.
     # To generate data for ECI fitting
-    if args.make_substructures_only:
-        print('Flag to create substructures only found.')
-        clfit = ClusterInfo(clusters_fname=f'{structure}/clusters_fit.out',)
-        print(
-            f'Found {clfit.num_clusters} no. of clusters to fit. Creating double as many structures...')
-        ref_list = open('references.in', 'w')
-        ref_list.write(".\n")
-        for label in range(clfit.num_clusters*args.mult_substructures):
-            create_structure(f'ecifit_{label}', args.percent_shuffle)
-            ref_list.write(f'ecifit_{label}\n')
-        ref_list.close()
+    #if args.make_substructures_only:
+    #    print('Flag to create substructures only found.')
+    #    clfit = ClusterInfo(clusters_fname=f'{structure}/clusters_fit.out',)
+    #    print(
+    #        f'Found {clfit.num_clusters} no. of clusters to fit. Creating double as many structures...')
+    #    ref_list = open('references.in', 'w')
+    #    ref_list.write(".\n")
+    #    for label in range(clfit.num_clusters*args.mult_substructures):
+    #        create_structure(f'ecifit_{label}', args.percent_shuffle)
+    #        ref_list.write(f'ecifit_{label}\n')
+    #    ref_list.close()
 
-        sys.exit('Created substructures. Now exiting')
+    #    sys.exit('Created substructures. Now exiting')
     # End of substructure making only.
 
     # This part of the code only fits the SRO correction vs T part.
@@ -446,53 +451,35 @@ if __name__ == '__main__':
 
     # This part of the code find the ordered correlation given the current ECI
     # Is skipped if no norm constraint if requried
-    if not args.no_constraint:
-        print("Norm Constraint activated...\n")
-
-        options = {'disp': bool(args.verbose),
-                   'maxiter': args.maxiter,
-                   'tol': args.xtol,
-                  }
-
-        print('Calculating Ordered Correlation....')
-        result_ord = opt.find_ordered(cluster_data=clusters_full,
-                                      corr=corr_rnd,
-                                      method=args.linprog_method,
-                                      options=options,
-                                     )
-        corr_ord = result_ord.x
-        print(f"Ordered correlation\t: {corr_ord}")
-        print(f"Ordered Energy\t: {result_ord.fun}") 
-        ord2disord_dist = np.linalg.norm(corr_ord - corr_rnd)
-        print(
-            f"L2 norm between the fully disordered and ordered state:\t {ord2disord_dist}")
-        print('\n========================================\n')
-        if args.fit_ordered_only:
-            sys.exit("Flag to find ordered state only detected. Exiting...")
-        print('Starting T optimisation...\n')
-    else:
-        if args.fit_ordered_only:
-
-            print("Flag to find ordered state only detected.")
-            options = {'disp': bool(args.verbose),
-                       'maxiter': args.maxiter,
-                       'tol': args.xtol,
-                      }
-
-            print('Calculating Ordered Correlation....')
-            result_ord = opt.find_ordered(cluster_data=clusters_full,
-                                          corr=corr_rnd,
-                                          method=args.linprog_method,
-                                          options=options
-                                         )
-            corr_ord = result_ord.x
-            print(f"Ordered correlation\t: {corr_ord}")
-            sys.exit('Exiting...')
-
+    if args.no_constraint:
         print("Norm Constraint not activated.\n")
         print("Turning off SRO fit flag since constraint is not activated.\n")
         args.skip_sro_fit = True
-        print('Starting T optimisation...\n')
+    else:
+        print("Norm Constraint activated...\n")
+
+    options = {'disp': bool(args.verbose),
+               'maxiter': args.maxiter,
+               'tol': args.xtol,
+              }
+
+    print('Calculating Ordered Correlation....')
+    result_ord = opt.find_ordered(cluster_data=clusters_full,
+                                  corr=corr_rnd,
+                                  method=args.linprog_method,
+                                  options=options,
+                                 )
+    corr_ord = result_ord.x
+    print(f"Ordered correlation\t: {corr_ord}")
+    print(f"Ordered Energy\t: {result_ord.fun}") 
+    ord2disord_dist = np.linalg.norm(corr_ord - corr_rnd)
+    print(
+        f"L2 norm between the fully disordered and ordered state:\t {ord2disord_dist}")
+    print('\n========================================\n')
+    if args.fit_ordered_only:
+        sys.exit("Flag to find ordered state only detected. Exiting...")
+
+    print('Starting T optimisation...\n')
 
     # End of the calcualting ordered correlations
     if args.approx_deriv:
@@ -512,25 +499,46 @@ if __name__ == '__main__':
                   clusters_full.configmult,
                   T,
                   clusters_full.eci)
-        if not args.no_constraint:
-            F_ord = F(corr_ord,
-                      clusters_full.vmat,
-                      clusters_full.kb,
-                      clusters_full.clusters,
-                      clusters_full.clustermult,
-                      clusters_full.configmult,
-                      T,
-                      clusters_full.eci)
-            print(f"Ordered CVM energy @ T = {T}K\t: {F_ord:.4f}")
-            print(f"Ordered Correlations @ T = {T}K\t: {corr_ord}")
-        print(f"Disordered CVM energy @ T = {T}K\t: {F_rnd:.4f}")
+        F_ord = F(corr_ord,
+            clusters_full.vmat,
+            clusters_full.kb,
+            clusters_full.clusters,
+            clusters_full.clustermult,
+            clusters_full.configmult,
+            T,
+            clusters_full.eci)
+        F_rnd_jac = F_jacobian(corr_rnd,
+                  clusters_full.vmat,
+                  clusters_full.kb,
+                  clusters_full.clusters,
+                  clusters_full.clustermult,
+                  clusters_full.configmult,
+                  T,
+                  clusters_full.eci)
+        F_rnd_hess = F_hessian(corr_rnd,
+                  clusters_full.vmat,
+                  clusters_full.kb,
+                  clusters_full.clusters,
+                  clusters_full.clustermult,
+                  clusters_full.configmult,
+                  T,
+                  clusters_full.eci)
+        print(f"Ordered CVM energy @ T = {T}K\t: {F_ord}")
+        print(f"Ordered Correlations @ T = {T}K\t: {corr_ord}")
+        print("Ordered Rhos:")
+        clusters_full.print_rho(corr_ord)
+        print(f"Disordered CVM energy @ T = {T}K\t: {F_rnd}")
         print(f"Disordered Correlations @ T = {T}K\t: {corr_rnd}")
+        #print(f"Disordered CVM energy jacobian @ T = {T}K\t: {F_rnd_jac}")
+        #print(f"Disordered CVM energy hessian @ T = {T}K\t: \n{F_rnd_hess}")
+        print("Disordered Rhos:")
+        clusters_full.print_rho(corr_rnd)
 
-        if not args.no_constraint:
+        if args.no_constraint:
+            constraints_sro = constraints.get_constraints_ordered(corr_rnd)
+        else:
             constraints_sro = constraints.get_constraints_sro(
                 ord2disord_dist, corr_rnd)
-        else:
-            constraints_sro = constraints.get_constraints_ordered(corr_rnd)
 
         bounds_sro = bounds.get_sro_bounds(FIXED_CORRS)
 
@@ -538,7 +546,7 @@ if __name__ == '__main__':
                    'maxiter': args.maxiter,
                    'xtol': args.xtol,
                    'gtol': args.gtol,
-                   'initial_constr_penalty': 1
+                   'initial_tr_radius':args.initial_tr_radius,
                    }
 
         result = opt.fit(F=F_efficient,
@@ -556,36 +564,27 @@ if __name__ == '__main__':
                          init_random=False,
                          init_disordered=True,
                          seed=args.seed,
-                         early_stopping_cond=args.earlystop
+                         early_stopping_cond=args.earlystop,
+                         ord2disord_dist=ord2disord_dist
                          )
         F_cvm = result.fun
         print(f"Optimised CVM energy @ T = {T}K\t: {F_cvm:.4f}")
         print(f"Optimised Correlation @ T = {T}K\t: {result.x}")
-        print(f"Optimised Rhos:")
+        print(f"Constraint Violation: {result.constr_violation}")
+        print(f"Optimised Gradient: {np.array2string(result.grad)}")
+        print("Optimised Rhos:")
         clusters_full.print_rho(result.x)
         print("\n#################################################")
         F_solid_solution = F_sqs + F_cvm - F_rnd
-        if args.no_constraint:
-            results_sro.append({'structure': structure.split('/')[-1],
-                                'temperature': T,
-                                'corrs': list(result.x),
-                                'F_sqs': F_sqs,
-                                'F_rnd': F_rnd,
-                                'F_cvm': F_cvm,
-                               }
-                              )
-        else:
-            results_sro.append({'structure': structure.split('/')[-1],
-                                'temperature': T,
-                                'corrs': list(result.x),
-                                'F_sqs': F_sqs,
-                                'F_rnd': F_rnd,
-                                'F_ord': F_ord,
-                                'F_cvm': F_cvm,
-                                'distance': ord2disord_dist - np.linalg.norm(result.x - corr_rnd)
-                                }
-                               )
-
+        results_sro.append({'structure': structure.split('/')[-1],
+                            'temperature': T,
+                            'corrs': list(result.x),
+                            'F_sqs': F_sqs,
+                            'F_rnd': F_rnd,
+                            'F_cvm': F_cvm,
+                            'distance': ord2disord_dist/2 - np.linalg.norm(result.x - corr_rnd)
+                           }
+                          )
         corrcols = [f'corr {i}' for i in range(clusters_full.num_clusters)]
         for item in results_sro:
             for idx, corrnum in enumerate(corrcols):

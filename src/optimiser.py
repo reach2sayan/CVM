@@ -73,7 +73,8 @@ def fit(F,
         init_random=False,
         init_disordered=True,
         seed=42,
-        early_stopping_cond=np.inf
+        early_stopping_cond=np.inf,
+        ord2disord_dist=0.0
         ):
     """
     Functions takes in all required inputs :
@@ -118,14 +119,18 @@ def fit(F,
                                       ]
                                      )
         elif init_disordered:
-            jitter = np.array([0,
-                               *[0]*len(cluster_data.single_point_clusters),
-                               *rng.normal(0, .001, cluster_data.num_clusters - len(cluster_data.single_point_clusters) - 1)
-                               ]
-                              )
-            corrs_attempt = corrs_trial+jitter
+            if trial == 0:
+                corrs_attempt = corrs_trial
+            else:
+                jitter = np.array([0,
+                                   *[0] *
+                                   len(cluster_data.single_point_clusters),
+                                   *rng.normal(0, .1, cluster_data.num_clusters - len(cluster_data.single_point_clusters) - 1)
+                                   ]
+                                  )
+                corrs_attempt = corrs_trial+jitter
 
-        print(f'{trial}: ',end='\r')
+        print(f'{trial}:', end='\r')
         temp_results = minimize(F,
                                 corrs_attempt,
                                 method='trust-constr',
