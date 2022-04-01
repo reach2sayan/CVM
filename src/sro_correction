@@ -21,7 +21,6 @@ from energyfunctions import *
 from fit_eci import fit_eci_scipy, fit_eci_lsfit, fit_eci_ransac
 from clusterdata import ClusterInfo
 from logger import Logger
-from create_cvm_structures import create_structure
 from sro_T_fit import sro_T_fit
 
 
@@ -88,21 +87,6 @@ if __name__ == '__main__':
                                  action='store_true',
                                  default=False,
                                  help="Skips the ECI fitting step.",
-                                 )
-    clus_fit_params.add_argument('--make_substructures_only',
-                                 action='store_true',
-                                 default=False,
-                                 help="Reads cluster description for fitting to create permuted structures and exists",
-                                 )
-    clus_fit_params.add_argument('--percent_shuffle', '-ps',
-                                 type=float,
-                                 default=0.25,
-                                 help="how many times to shuffle labels to create structures for ECI fit",
-                                 )
-    clus_fit_params.add_argument('--mult_substructures', '-ms',
-                                 type=float,
-                                 default=2,
-                                 help="how many substructures to make as a multiple of number of ECI to fit",
                                  )
 
     clus_params.add_argument('--eci',
@@ -509,7 +493,7 @@ if __name__ == '__main__':
             clusters_full.eci)
         print(f"Ordered CVM energy @ T = {T}K\t: {F_ord}")
         print(f"Ordered Correlations @ T = {T}K\t: {corr_ord}")
-        print(f"Disordered CVM energy @ T = {T}K\t: {F_rnd}")
+        print(f"Disordered CVM Free energy @ T = {T}K\t: {F_rnd}")
         print(f"Disordered Correlations @ T = {T}K\t: {corr_rnd}")
 
         if args.no_constraint:
@@ -546,10 +530,10 @@ if __name__ == '__main__':
                          ord2disord_dist=ord2disord_dist
                          )
         F_cvm = result.fun
-        print(f"Optimised CVM energy @ T = {T}K\t: {F_cvm:.4f}")
+        print(f"Optimised CVM Free energy @ T = {T}K\t: {F_cvm:.4f}")
         print(f"Optimised Correlation @ T = {T}K\t: {result.x}")
         print(f"Constraint Violation: {result.constr_violation}")
-        print(f"Optimised Gradient: {np.array2string(result.grad)}")
+        print(f"Optimised Free energy Gradient: {np.array2string(result.grad)}")
         print("Optimised Rhos:")
         clusters_full.print_rho(result.x)
         print("\n#################################################")
