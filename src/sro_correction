@@ -523,11 +523,11 @@ if __name__ == '__main__':
                   clusters_full.configmult,
                   T,
                   clusters_full.eci)
-        print(f"Ordered CVM energy @ T = {T}K\t: {F_ord}")
+        print(f"Ordered CVM Free energy @ T = {T}K\t: {F_ord}")
         print(f"Ordered Correlations @ T = {T}K\t: {corr_ord}")
         print("Ordered Rhos:")
         clusters_full.print_rho(corr_ord)
-        print(f"Disordered CVM energy @ T = {T}K\t: {F_rnd}")
+        print(f"Disordered CVM Free energy @ T = {T}K\t: {F_rnd}")
         print(f"Disordered Correlations @ T = {T}K\t: {corr_rnd}")
         #print(f"Disordered CVM energy jacobian @ T = {T}K\t: {F_rnd_jac}")
         #print(f"Disordered CVM energy hessian @ T = {T}K\t: \n{F_rnd_hess}")
@@ -568,10 +568,10 @@ if __name__ == '__main__':
                          ord2disord_dist=ord2disord_dist
                          )
         F_cvm = result.fun
-        print(f"Optimised CVM energy @ T = {T}K\t: {F_cvm:.4f}")
+        print(f"Optimised CVM Free energy @ T = {T}K\t: {F_cvm:.4f}")
         print(f"Optimised Correlation @ T = {T}K\t: {result.x}")
         print(f"Constraint Violation: {result.constr_violation}")
-        print(f"Optimised Gradient: {np.array2string(result.grad)}")
+        print(f"Optimised Free energy Gradient: {np.array2string(result.grad)}")
         print("Optimised Rhos:")
         clusters_full.print_rho(result.x)
         print("\n#################################################")
