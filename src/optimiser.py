@@ -125,7 +125,7 @@ def fit(F,
                 jitter = np.array([0,
                                    *[0] *
                                    len(cluster_data.single_point_clusters),
-                                   *rng.normal(0, .1, cluster_data.num_clusters - len(cluster_data.single_point_clusters) - 1)
+                                   *rng.normal(0, .001, cluster_data.num_clusters - len(cluster_data.single_point_clusters) - 1)
                                    ]
                                   )
                 corrs_attempt = corrs_trial+jitter

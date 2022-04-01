@@ -222,6 +222,11 @@ if __name__ == '__main__':
                             type=float,
                             help="Initial Trust radius for the optimisation",
                            )
+    opt_params.add_argument('--initial_constr_penalty',
+                            default=1,
+                            type=float,
+                            help="Initial Penalty to constraint matching",
+                           )
     opt_params.add_argument('--global_trials',
                             default=50,
                             type=int,
@@ -508,7 +513,8 @@ if __name__ == '__main__':
                    'maxiter': args.maxiter,
                    'xtol': args.xtol,
                    'gtol': args.gtol,
-                   'initial_tr_radius':args.initial_tr_radius,
+                   'initial_tr_radius': 1e-24, #args.initial_tr_radius,
+                   'initial_constr_penalty':1
                    }
 
         result = opt.fit(F=F_efficient,
