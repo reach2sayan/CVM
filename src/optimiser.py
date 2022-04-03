@@ -168,9 +168,9 @@ def fit(F,
         if temp_results.fun > fattempt:
             options['initial_tr_radius'] = options['initial_tr_radius']/10
             if display_inter:
-                #print(
-                #    f"Reducing Initial trust radius from {options['initial_tr_radius']*10} -->  {options['initial_tr_radius']}")
-                pass
+                print(
+                  f"Optimising Initial trust radius from {options['initial_tr_radius']*10:.2E} -->  {options['initial_tr_radius']:.2E}")
+                #pass
             trial -= 1
 
         elif temp_results.fun < result_value and cluster_data.check_result_validity(temp_results.x):
@@ -191,10 +191,14 @@ def fit(F,
                 print(f'Current minimum correlations: {temp_results.x}')
                 print(f"Gradient: {np.array2string(temp_results.grad)}")
                 print(f"Constraint Violation: {temp_results.constr_violation}")
-                print(f"Final Trust Radius: {temp_results.tr_radius}")
+                print(f"Current Trust Radius: {temp_results.tr_radius}")
                 print(
                     f"Stop Status: {temp_results.status} | {temp_results.message}")
                 print('\n====================================\n')
+
+        elif temp_results.status == 0:
+          print(
+            f"Stop Status: {temp_results.status} | {temp_results.message}")
         else:
             steps_b4_mini += 1
 

@@ -471,6 +471,10 @@ if __name__ == '__main__':
     corr_ord = result_ord.x
     print(f"Ordered correlation\t: {corr_ord}")
     print(f"Ordered Energy\t: {result_ord.fun}") 
+    print(f"Ordered Rho:\n{clusters_full.print_rho(corr_ord)}")
+    print()
+    print(f"DisOrdered correlation\t: {corr_rnd}")
+    print(f"DisOrdered Rho:\n{clusters_full.print_rho(corr_rnd)}")
     ord2disord_dist = np.linalg.norm(corr_ord - corr_rnd)
     print(
         f"L2 norm between the fully disordered and ordered state:\t {ord2disord_dist}")
@@ -545,7 +549,7 @@ if __name__ == '__main__':
                          ord2disord_dist=ord2disord_dist
                          )
         F_cvm = result.fun
-        print(f"Optimised CVM Free energy @ T = {T}K\t: {F_cvm:.4f}")
+        print(f"Optimised CVM Free energy @ T = {T}K\t: {F_cvm}")
         print(f"Optimised Correlation @ T = {T}K\t: {result.x}")
         print(f"Constraint Violation: {result.constr_violation}")
         print(f"Optimised Free energy Gradient: {np.array2string(result.grad)}")

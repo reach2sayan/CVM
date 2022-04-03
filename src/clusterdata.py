@@ -46,7 +46,6 @@ class ClusterInfo:
     def print_rho(self, corrs):
 
         for vmat in self.vmat.values():
-            #print(f"{' '.join(map(str, vmat @ corrs))}")
             with np.printoptions(precision=3,suppress=True):
                 print(np.array(vmat @ corrs))
         return
@@ -82,14 +81,13 @@ class ClusterInfo:
 
     def check_result_validity(self, corrs):
         try:
-            for vmat in self.vmat.values():
-                rhos = np.array(vmat @ corrs)
-                assert np.all((rhos >= 0.0) & (rhos <= 1.0))
-        except AssertionError:
-            #print("Invalid Rho")
-            return False
-
+          for vmat in self.vmat.values():
+            rho = vmat @ corrs
+            assert np.all((rho >= 0.0) & (rho <= 1.0))
+        except Exception:
+          pass
         return True
+
 
     @classmethod
     def read_clusters(cls, clusters_fname):
