@@ -2,11 +2,12 @@
 Optimiser module for SRO Correction
 """
 
+import itertools
 import numpy as np
 from scipy.optimize import minimize
 from scipy.optimize import BFGS
 from scipy.optimize import linprog
-import itertools
+from scan_disordered import get_initial_trial
 
 
 def find_ordered(cluster_data, corr, method, options, fix_point=True, print_output=True,):
@@ -65,16 +66,17 @@ def fit(F,
         jac,
         hess,
         NUM_TRIALS,
+        NUM_INIT_TRIALS,
         bounds,
         constraints,
         corrs_trial,
+        trial_variance,
         display_inter=False,
         approx_deriv=True,
-        init_random=False,
-        init_disordered=True,
         seed=42,
         early_stopping_cond=np.inf,
-        ord2disord_dist=0.0
+        ord2disord_dist=0.0,
+        constraint=True
         ):
     """
     Functions takes in all required inputs :
@@ -85,7 +87,7 @@ def fit(F,
         4. Other fitting parameters
     and returns the minimised set of values for the particular section of the CVM correction pipeline.
     """
-    rng = np.random.default_rng(seed)
+    #rng = np.random.default_rng(seed)
     result = None
     result_value = 1e5
 
@@ -113,23 +115,16 @@ def fit(F,
     steps_b4_mini = 0
     trial = 0
     while trial < NUM_TRIALS:  # al in range(NUM_TRIALS):
-        if init_random:
-            corrs_attempt = np.array([1, *[corrs_trial[1]]*len(cluster_data.single_point_clusters),
-                                      *rng.uniform(-1, 1, cluster_data.num_clusters - len(cluster_data.single_point_clusters) - 1)
-                                      ]
-                                     )
-        elif init_disordered:
-            if trial == 0:
-                corrs_attempt = corrs_trial
-            else:
-                jitter = np.array([0,
-                                   *[0] *
-                                   len(cluster_data.single_point_clusters),
-                                   *rng.normal(0, .001, cluster_data.num_clusters - len(cluster_data.single_point_clusters) - 1)
-                                   ]
-                                  )
-                corrs_attempt = corrs_trial+jitter
 
+        fattempt, corrs_attempt = get_initial_trial(cluster_data=cluster_data,
+                                                    corr_rnd=corrs_trial,
+                                                    T=temp,
+                                                    ord2disord_dist=ord2disord_dist,
+                                                    constraint=constraint,
+                                                    trial_variance=trial_variance,
+                                                    num_trials=NUM_INIT_TRIALS,
+                                                    seed=seed
+                                                    )
         print(f'{trial}:', end='\r')
         temp_results = minimize(F,
                                 corrs_attempt,
@@ -148,22 +143,26 @@ def fit(F,
                                 bounds=bounds,
                                 )
 
-        if temp_results.fun < result_value:
+        if temp_results.fun > fattempt:
+            options['initial_tr_radius'] = options['initial_tr_radius']/10
+            if display_inter:
+                print(
+                    f"Reducing Initial trust radius from {options['initial_tr_radius']*10} -->  {options['initial_tr_radius']}")
+            trial -= 1
+
+        elif temp_results.fun < result_value and cluster_data.check_result_validity(temp_results.x):
             try:
                 assert not np.all(np.isnan(temp_results.grad))
             except AssertionError:
                 print('Gradient blew up!! Incorrect solution. Moving on...')
                 continue
-            try:
-                assert temp_results.status != 0
-            except AssertionError:
-                print(f'{temp_results.status} | {temp_results.message}')
 
             steps_b4_mini = 0
             result = temp_results
             result_value = temp_results.fun
 
             if display_inter:
+                print(f'Attempt Energy: {fattempt}')
                 print(f'Current Energy: {temp_results.fun}')
                 print(f'Current minimum correlations: {temp_results.x}')
                 print(f"Gradient: {np.array2string(temp_results.grad)}")

@@ -202,6 +202,11 @@ if __name__ == '__main__':
                             type=int,
                             help="Indicate maximum iterations for the local optimiser ",
                             )
+    opt_params.add_argument('--maxiter_simplex',
+                            default=1000000,
+                            type=int,
+                            help="Indicate maximum iterations for simplex procedure ",
+                           )
     opt_params.add_argument('--earlystop',
                             default=25,
                             type=int,
@@ -217,21 +222,26 @@ if __name__ == '__main__':
                             type=float,
                             help="Indicate the acceptable violation of constraints ",
                             )
-    opt_params.add_argument('--initial_tr_radius',
-                            default=1e-24,
+    opt_params.add_argument('--trial_variance',
+                            default=0.01,
                             type=float,
-                            help="Initial Trust radius for the optimisation",
+                            help="Trial Varianec",
                            )
-    opt_params.add_argument('--initial_constr_penalty',
-                            default=1,
+    opt_params.add_argument('--initial_tr_radius',
+                            default=0.01,
                             type=float,
-                            help="Initial Penalty to constraint matching",
+                            help="Indicate the acceptable violation of constraints ",
                            )
     opt_params.add_argument('--global_trials',
                             default=50,
                             type=int,
                             help="Indicate the number of initial point iteration for global minima search ",
                             )
+    opt_params.add_argument('--init_trials',
+                            default=10000,
+                            type=int,
+                            help="Indicate maximum iterations for the local optimiser ",
+                           )
     opt_params.add_argument('--show_warning',
                             action='store_true',
                             default=False,
@@ -496,7 +506,7 @@ if __name__ == '__main__':
             clusters_full.configmult,
             T,
             clusters_full.eci)
-        print(f"Ordered CVM energy @ T = {T}K\t: {F_ord}")
+        print(f"Ordered CVM Free energy @ T = {T}K\t: {F_ord}")
         print(f"Ordered Correlations @ T = {T}K\t: {corr_ord}")
         print(f"Disordered CVM Free energy @ T = {T}K\t: {F_rnd}")
         print(f"Disordered Correlations @ T = {T}K\t: {corr_rnd}")
@@ -513,8 +523,7 @@ if __name__ == '__main__':
                    'maxiter': args.maxiter,
                    'xtol': args.xtol,
                    'gtol': args.gtol,
-                   'initial_tr_radius': 1e-24, #args.initial_tr_radius,
-                   'initial_constr_penalty':1
+                   'initial_tr_radius' :args.initial_tr_radius
                    }
 
         result = opt.fit(F=F_efficient,
@@ -524,13 +533,13 @@ if __name__ == '__main__':
                          jac=F_jacobian_efficient,
                          hess=F_hessian_efficient,
                          NUM_TRIALS=args.global_trials,
+                         NUM_INIT_TRIALS=args.init_trials,
                          bounds=bounds_sro,
                          constraints=constraints_sro,
                          corrs_trial=corr_rnd,
+                         trial_variance=args.trial_variance,
                          display_inter= not args.no_inter,
                          approx_deriv=args.approx_deriv,
-                         init_random=False,
-                         init_disordered=True,
                          seed=args.seed,
                          early_stopping_cond=args.earlystop,
                          ord2disord_dist=ord2disord_dist

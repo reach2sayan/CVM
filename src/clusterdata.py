@@ -82,13 +82,11 @@ class ClusterInfo:
 
     def check_result_validity(self, corrs):
         try:
-            for config_idx in self.configmult:
-                assert np.isclose(np.inner(self.configmult[config_idx], self.vmat[config_idx] @ corrs),
-                                  1.0,
-                                  rtol=1e-3
-                                  )
+            for vmat in self.vmat.values():
+                rhos = np.array(vmat @ corrs)
+                assert np.all((rhos >= 0.0) & (rhos <= 1.0))
         except AssertionError:
-            print("Invalid Rho")
+            #print("Invalid Rho")
             return False
 
         return True
