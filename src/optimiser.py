@@ -87,7 +87,7 @@ def fit(F,
         4. Other fitting parameters
     and returns the minimised set of values for the particular section of the CVM correction pipeline.
     """
-    #rng = np.random.default_rng(seed)
+    rng = np.random.default_rng(seed)
     result = None
     result_value = 1e5
 
@@ -114,17 +114,39 @@ def fit(F,
 
     steps_b4_mini = 0
     trial = 0
+    found_optim_radius = False
     while trial < NUM_TRIALS:  # al in range(NUM_TRIALS):
 
-        fattempt, corrs_attempt = get_initial_trial(cluster_data=cluster_data,
-                                                    corr_rnd=corrs_trial,
-                                                    T=temp,
-                                                    ord2disord_dist=ord2disord_dist,
-                                                    constraint=constraint,
-                                                    trial_variance=trial_variance,
-                                                    num_trials=NUM_INIT_TRIALS,
-                                                    seed=seed
-                                                    )
+        if found_optim_radius:
+            jitter = np.array([0,
+                               *[0] *
+                               len(cluster_data.single_point_clusters),
+                               *rng.normal(0,
+                                           trial_variance,
+                                           cluster_data.num_clusters -
+                                           len(cluster_data.single_point_clusters) - 1
+                                          )
+                              ]
+                             )
+            corrs_attempt = corrs_trial+jitter
+            fattempt = F(corrs_attempt,
+                         mults_eci,
+                         multconfig_kb,
+                         all_vmat,
+                         vrhologrho,
+                         temp
+                        )
+        else:
+            fattempt, corrs_attempt = get_initial_trial(cluster_data=cluster_data,
+                                                        corr_rnd=corrs_trial,
+                                                        T=temp,
+                                                        ord2disord_dist=ord2disord_dist,
+                                                        constraint=constraint,
+                                                        trial_variance=trial_variance,
+                                                        num_trials=NUM_INIT_TRIALS,
+                                                        seed=seed
+                                                       )
+
         print(f'{trial}:', end='\r')
         temp_results = minimize(F,
                                 corrs_attempt,
@@ -146,11 +168,13 @@ def fit(F,
         if temp_results.fun > fattempt:
             options['initial_tr_radius'] = options['initial_tr_radius']/10
             if display_inter:
-                print(
-                    f"Reducing Initial trust radius from {options['initial_tr_radius']*10} -->  {options['initial_tr_radius']}")
+                #print(
+                #    f"Reducing Initial trust radius from {options['initial_tr_radius']*10} -->  {options['initial_tr_radius']}")
+                pass
             trial -= 1
 
         elif temp_results.fun < result_value and cluster_data.check_result_validity(temp_results.x):
+            found_optim_radius = True
             try:
                 assert not np.all(np.isnan(temp_results.grad))
             except AssertionError:
@@ -167,6 +191,7 @@ def fit(F,
                 print(f'Current minimum correlations: {temp_results.x}')
                 print(f"Gradient: {np.array2string(temp_results.grad)}")
                 print(f"Constraint Violation: {temp_results.constr_violation}")
+                print(f"Final Trust Radius: {temp_results.tr_radius}")
                 print(
                     f"Stop Status: {temp_results.status} | {temp_results.message}")
                 print('\n====================================\n')
