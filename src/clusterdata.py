@@ -83,9 +83,9 @@ class ClusterInfo:
         try:
           for vmat in self.vmat.values():
             rho = vmat @ corrs
-            assert np.all((rho >= 0.0) & (rho <= 1.0))
+            assert np.all([x >= 0.0 and x <= 1.0 for x in rho])
         except Exception:
-          pass
+          return False
         return True
 
 
