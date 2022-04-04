@@ -36,7 +36,7 @@ if __name__ == '__main__':
         return np.linspace(start, stop, int((stop - start) / step + 1))
 
     np.set_printoptions(suppress=True, precision=4)
-    date = date.today().strftime('%b-%d')
+    tdate = date.today().strftime('%b-%d-%k%M')
     structure = os.getcwd()
     path = Path(structure)
     phase = str(path.parent.absolute())
@@ -264,11 +264,34 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     if args.no_constraint:
-        args.log = f'{args.log}-nocons-{date}'
-        args.out = f'{args.out}-nocons-{date}'
+        args.log = f'{args.log}-nocons-{tdate}'
+        args.out = f'{args.out}-nocons-{tdate}'
     else:
-        args.log = f'{args.log}-cons-{date}'
-        args.out = f'{args.out}-cons-{date}'
+        args.log = f'{args.log}-cons-{tdate}'
+        args.out = f'{args.out}-cons-{tdate}'
+
+    # This part of the code only fits the SRO correction vs T part.
+    # This section is repeated at the very end because I didn't want to write another wrapper for 20 lines of code.
+    if args.fit_sro_only:
+        print('Flag to fit SRO as a function of T only found. Skipping all optimisation Steps.')
+        best_params = sro_T_fit(sro_T,
+                                args.degree,
+                                args.out,
+                                args.coeff_in,
+                                args.skip_expo,
+                                args.sro_method,
+                                args.verbose
+                               )
+
+        with open(f'{args.coeff_out}-{tdate}', 'w') as fout:
+            for d in range(args.degree+1):
+                c = best_params[f'coeff_{d}']
+                e = best_params[f'exp_{d}']
+                fout.write(f'{c},{e}\n')
+                bestC = best_params['C']
+                fout.write(f'{bestC},0')
+                sys.exit(1)
+    # End of SRO correction fitting to T only
 
     sys.stdout = Logger(sys.stdout, args.log, args.toscreen)
     print(f"Phase: {phase.split('/')[-1]}")
@@ -292,30 +315,6 @@ if __name__ == '__main__':
 
     #    sys.exit('Created substructures. Now exiting')
     # End of substructure making only.
-
-    # This part of the code only fits the SRO correction vs T part.
-    # This section is repeated at the very end because I didn't want to write another wrapper for 20 lines of code.
-    if args.fit_sro_only:
-        print('Flag to fit SRO as a function of T only found. Skipping all optimisation Steps.')
-        best_params = sro_T_fit(sro_T,
-                                args.degree,
-                                args.out,
-                                args.coeff_in,
-                                args.skip_expo,
-                                args.sro_method,
-                                args.verbose
-                                )
-
-        with open(f'{args.coeff_out}', 'w') as fout:
-            for d in range(args.degree+1):
-                c = best_params[f'coeff_{d}']
-                e = best_params[f'exp_{d}']
-                fout.write(f'{c},{e}\n')
-            bestC = best_params['C']
-            fout.write(f'{bestC},0')
-        sys.exit(1)
-    # End of SRO correction fitting to T only
-
 
     # Generate Full Cluster Description
     try:
@@ -421,14 +420,14 @@ if __name__ == '__main__':
         sys.exit('Flag to fit only detected. Exiting now...')
     # End ECI fitting
 
-    with open(f'{structure}/energy', 'r') as energy_file:
-      e = float(energy_file.readline())
+    #with open(f'{structure}/energy', 'r') as energy_file:
+    #  e = float(energy_file.readline())
 
-    num_atoms = sum(1 for line in open(f"{structure}/str.in")) - 6
-    F_sqs = e/num_atoms
-    with open(f'{structure}/energy_atom', 'w') as feperatom:
-      feperatom.write(str(F_sqs))
-      print(f"Read in SQS energy\t: {F_sqs:.4f}")
+    #num_atoms = sum(1 for line in open(f"{structure}/str.in")) - 6
+    #F_sqs = e/num_atoms
+    #with open(f'{structure}/energy_atom', 'w') as feperatom:
+    #  feperatom.write(str(F_sqs))
+    #  print(f"Read in SQS energy\t: {F_sqs:.4f}")
 
     results_sro = []
     corr_rnd = subprocess.run(['corrdump', '-c', f'-cf={structure}/{args.clusters}', f'-s={structure}/str.in', f'-l={structure}/{args.lat}', '-rnd'],
@@ -586,7 +585,7 @@ if __name__ == '__main__':
                                 args.verbose
                                 )
 
-        with open(f'{args.coeff_out}', 'w') as fout:
+        with open(f'{args.coeff_out}-{tdate}', 'w') as fout:
             for d in range(args.degree+1):
                 c = best_params[f'coeff_{d}']
                 e = best_params[f'exp_{d}']

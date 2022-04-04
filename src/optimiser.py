@@ -201,7 +201,10 @@ def fit(F,
         if trial > NUM_TRIALS/2 and steps_b4_mini > early_stopping_cond:
             print(
                 f'No improvement for {early_stopping_cond} steps. After half of max steps ({NUM_TRIALS}) were done.')
+            if result is None
+                print("WARNING: Current value of the minimisation is None. Something must be wrong with the simulation parameters. Please check.")
             break
+
         trial += 1
 
     return result

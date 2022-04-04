@@ -3,11 +3,16 @@
 import sys
 import matplotlib.pyplot as plt
 import numpy as np
+import os
+from pathlib import Path
+import sys
 
 from sro_T_fit import read_results
 
 plt.style.use('default')
-
+structure = os.getcwd()
+path = Path(structure)
+phase = str(path.parent.absolute())
 
 def plot_eci_fit(energy_file='ref_energies.in',
                  corr_file='ref_correlations.in',
@@ -57,6 +62,7 @@ def plot_sro_fit(xdata_file='x_sro.dat',
 
     plt.plot(xdata, ydata, '.', label='data')
     plt.plot(xr, yr, label='fit')
+    plt.suptitle(f"SRO Correction {phase.split('/')[-1]} :: {structure.split('/')[-1]}")
     plt.xlabel('T')
     plt.ylabel(r'F$_{cvm}$ - F$_{disordered}$')
     plt.grid(True)
