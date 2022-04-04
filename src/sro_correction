@@ -9,7 +9,7 @@ import sys
 import warnings
 import json
 import subprocess
-from datetime import date
+from datetime import datetime
 
 import numpy as np
 import scipy as sp
@@ -36,7 +36,7 @@ if __name__ == '__main__':
         return np.linspace(start, stop, int((stop - start) / step + 1))
 
     np.set_printoptions(suppress=True, precision=4)
-    tdate = date.today().strftime('%b-%d-%k%M')
+    tdate = datetime.now().strftime('%b-%d-%k%M')
     structure = os.getcwd()
     path = Path(structure)
     phase = str(path.parent.absolute())
@@ -420,14 +420,14 @@ if __name__ == '__main__':
         sys.exit('Flag to fit only detected. Exiting now...')
     # End ECI fitting
 
-    #with open(f'{structure}/energy', 'r') as energy_file:
-    #  e = float(energy_file.readline())
+    with open(f'{structure}/energy', 'r') as energy_file:
+      e = float(energy_file.readline())
 
-    #num_atoms = sum(1 for line in open(f"{structure}/str.in")) - 6
-    #F_sqs = e/num_atoms
-    #with open(f'{structure}/energy_atom', 'w') as feperatom:
-    #  feperatom.write(str(F_sqs))
-    #  print(f"Read in SQS energy\t: {F_sqs:.4f}")
+    num_atoms = sum(1 for line in open(f"{structure}/str.in")) - 6
+    F_sqs = e/num_atoms
+    with open(f'{structure}/energy_atom', 'w') as feperatom:
+      feperatom.write(str(F_sqs))
+      print(f"Read in SQS energy\t: {F_sqs:.4f}")
 
     results_sro = []
     corr_rnd = subprocess.run(['corrdump', '-c', f'-cf={structure}/{args.clusters}', f'-s={structure}/str.in', f'-l={structure}/{args.lat}', '-rnd'],
@@ -457,19 +457,33 @@ if __name__ == '__main__':
         print("Norm Constraint activated...\n")
 
     options = {'disp': bool(args.verbose),
-               'maxiter': args.maxiter,
+               'maxiter': args.maxiter_simplex,
                'tol': args.xtol,
               }
 
-    print('Calculating Ordered Correlation....')
-    result_ord = opt.find_ordered(cluster_data=clusters_full,
-                                  corr=corr_rnd,
-                                  method=args.linprog_method,
-                                  options=options,
-                                 )
-    corr_ord = result_ord.x
+    if Path(f"{structure}/ordered_correlations.out").is_file():
+        print("File containing ordered correlations read.")
+        corr_ord = np.loadtxt(f"{structure}/ordered_correlations.out")
+        E_ord = F(corr_ord,
+                  clusters_full.vmat,
+                  clusters_full.kb,
+                  clusters_full.clusters,
+                  clusters_full.clustermult,
+                  clusters_full.configmult,
+                  0,
+                  clusters_full.eci)
+    else:
+        print('Calculating Ordered Correlation....')
+        result_ord = opt.find_ordered(cluster_data=clusters_full,
+                                      corr=corr_rnd,
+                                      method=args.linprog_method,
+                                      options=options,
+                                     )
+        corr_ord = result_ord.x
+        E_ord = result_ord.fun
+
     print(f"Ordered correlation\t: {corr_ord}")
-    print(f"Ordered Energy\t: {result_ord.fun}") 
+    print(f"Ordered Energy\t: {E_ord}") 
     print("Ordered Rho:\n")
     clusters_full.print_rho(corr_ord)
     print()
