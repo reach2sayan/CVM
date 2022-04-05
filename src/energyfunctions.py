@@ -3,18 +3,8 @@ import math
 
 kB = 8.617330337217213e-05
 
-
-def sro_T(T, **params):
-
-    r = 0
-    degree = params['degree']
-    for i in range(degree+1):
-        if i == 0:
-            r += params[f'coeff_{i}']
-        else:
-            r += params[f'coeff_{i}']*np.exp(-params[f'exp_{i}']/(kB*T))
-
-    return -np.abs(params['C'])*np.abs(r)
+def sro_model(T, a1, a2, a3, b1, b2, b3, C):
+  return -C*np.abs(1 + a1*np.exp(-b1/(kB*T)) + a2*np.exp(-b2/(kB*T)) + a3*np.exp(-b3/(kB*T)))
 
 def F_efficient(corrs, mults_eci, multconfig_kb, all_vmat, vect_rhologrho, temp):
 

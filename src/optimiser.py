@@ -69,6 +69,7 @@ def fit(F,
         NUM_INIT_TRIALS,
         bounds,
         constraints,
+        constr_tol,
         corrs_trial,
         trial_variance,
         display_inter=False,
@@ -90,6 +91,7 @@ def fit(F,
     rng = np.random.default_rng(seed)
     result = None
     result_value = 1e5
+    constr_viol = 1e5
 
     mult_arr = np.array(list(cluster_data.clustermult.values()))
     eci_arr = np.array(list(cluster_data.eci.values()))
@@ -166,35 +168,35 @@ def fit(F,
                                 )
 
         if temp_results.fun > fattempt:
-            options['initial_tr_radius'] = options['initial_tr_radius']/10
-            if display_inter:
-                print(
-                  f"Optimising Initial trust radius from {options['initial_tr_radius']*10:.2E} -->  {options['initial_tr_radius']:.2E}")
-                #pass
-            trial -= 1
+          options['initial_tr_radius'] = options['initial_tr_radius']/10
+          if display_inter:
+              print(
+                f"Optimising Initial trust radius from {options['initial_tr_radius']*10:.2E} -->  {options['initial_tr_radius']:.2E}")
+              #pass
+          trial -= 1
 
-        elif temp_results.fun < result_value and cluster_data.check_result_validity(temp_results.x):
-            found_optim_radius = True
-            try:
-                assert not np.all(np.isnan(temp_results.grad))
-            except AssertionError:
-                print('Gradient blew up!! Incorrect solution. Moving on...')
-                continue
+        elif temp_results.fun < result_value and temp_results.constr_violation < constr_tol: 
+          found_optim_radius = True
+          try:
+              assert not np.all(np.isnan(temp_results.grad))
+          except AssertionError:
+              print('Gradient blew up!! Incorrect solution. Moving on...')
+              continue
 
-            steps_b4_mini = 0
-            result = temp_results
-            result_value = temp_results.fun
+          steps_b4_mini = 0
+          result = temp_results
+          result_value = temp_results.fun
 
-            if display_inter:
-                print(f'Attempt Energy: {fattempt}')
-                print(f'Current Energy: {temp_results.fun}')
-                print(f'Current minimum correlations: {temp_results.x}')
-                print(f"Gradient: {np.array2string(temp_results.grad)}")
-                print(f"Constraint Violation: {temp_results.constr_violation}")
-                print(f"Current Trust Radius: {temp_results.tr_radius}")
-                print(
-                    f"Stop Status: {temp_results.status} | {temp_results.message}")
-                print('\n====================================\n')
+          if display_inter:
+              print(f'Attempt Energy: {fattempt}')
+              print(f'Current Energy: {temp_results.fun}')
+              print(f'Current minimum correlations: {temp_results.x}')
+              print(f"Gradient: {np.array2string(temp_results.grad)}")
+              print(f"Constraint Violation: {temp_results.constr_violation}")
+              print(f"Current Trust Radius: {temp_results.tr_radius}")
+              print(
+                  f"Stop Status: {temp_results.status} | {temp_results.message}")
+              print('\n====================================\n')
 
         elif temp_results.status == 0:
           print(

@@ -21,7 +21,7 @@ from energyfunctions import *
 from fit_eci import fit_eci_scipy, fit_eci_lsfit, fit_eci_ransac
 from clusterdata import ClusterInfo
 from logger import Logger
-from sro_T_fit import sro_T_fit
+from sro_fit import sro_fit
 
 
 if __name__ == '__main__':
@@ -137,13 +137,8 @@ if __name__ == '__main__':
                                 type=int,
                                 help="Temperature increment steps in which the SRO correction is to be evaluated "
                                 )
-    sro_fit_params.add_argument('--degree', '--deg',
-                                default='3',
-                                type=int,
-                                help="Maximum power of the fit ",
-                                )
     sro_fit_params.add_argument('--sro_method',
-                                default='least-squares',
+                                default='lm',
                                 help="method of fitting a function on T to the SRO correction",
                                 )
     sro_fit_params.add_argument('--coeff_out',
@@ -153,11 +148,6 @@ if __name__ == '__main__':
     sro_fit_params.add_argument('--coeff_in',
                                 default='sro_coeffs.in',
                                 help="filename to store the initial params of the fit ",
-                                )
-    sro_fit_params.add_argument('--skip_expo',
-                                action='store_true',
-                                default=False,
-                                help="Flag to skip fitting exponents ",
                                 )
     sro_fit_params.add_argument('--skip_sro_fit',
                                 action='store_true',
@@ -175,6 +165,11 @@ if __name__ == '__main__':
                             default=False,
                             help="Flag to disable norm constraint "
                             )
+    opt_params.add_argument('--constr_tol',
+                            type=float,
+                            default=1e-5,
+                            help="Value for minimum tolerance of constraints"
+                           )
     opt_params.add_argument('--fit_ordered_only',
                             action='store_true',
                             default=False,
@@ -262,6 +257,25 @@ if __name__ == '__main__':
                             )
 
     args = parser.parse_args()
+    if not args.show_warning:
+      warnings.filterwarnings("ignore")
+    # This part of the code only fits the SRO correction vs T part.
+    # This section is repeated at the very end because I didn't want to write another wrapper for 20 lines of code.
+    if args.fit_sro_only:
+      print('Flag to fit SRO as a function of T only found. Skipping all optimisation Steps.')
+      best_params, _ = sro_fit(func=sro_model,
+                               results=f'{structure}/{args.out}',
+                               coeff_in=f'{structure}/{args.coeff_in}',
+                               method=args.sro_method,
+                               verbose=args.verbose
+                              )
+      np.savetxt(f'{structure}/{args.coeff_out}-{tdate}', best_params)
+      sys.exit('SRO Fit completed. Exiting..')
+      # End of SRO correction fitting to T only
+    with open(f'{structure}/params-{tdate}.out','w') as fparam:
+      fparam.write("Param \t Value\n")
+      for name, value in args.__dict__.items():
+        fparam.write(f"{name}\t{value}\n")
 
     if args.no_constraint:
         args.log = f'{args.log}-nocons-{tdate}'
@@ -270,34 +284,10 @@ if __name__ == '__main__':
         args.log = f'{args.log}-cons-{tdate}'
         args.out = f'{args.out}-cons-{tdate}'
 
-    # This part of the code only fits the SRO correction vs T part.
-    # This section is repeated at the very end because I didn't want to write another wrapper for 20 lines of code.
-    if args.fit_sro_only:
-        print('Flag to fit SRO as a function of T only found. Skipping all optimisation Steps.')
-        best_params = sro_T_fit(sro_T,
-                                args.degree,
-                                args.out,
-                                args.coeff_in,
-                                args.skip_expo,
-                                args.sro_method,
-                                args.verbose
-                               )
-
-        with open(f'{args.coeff_out}-{tdate}', 'w') as fout:
-            for d in range(args.degree+1):
-                c = best_params[f'coeff_{d}']
-                e = best_params[f'exp_{d}']
-                fout.write(f'{c},{e}\n')
-                bestC = best_params['C']
-                fout.write(f'{bestC},0')
-                sys.exit(1)
-    # End of SRO correction fitting to T only
 
     sys.stdout = Logger(sys.stdout, args.log, args.toscreen)
     print(f"Phase: {phase.split('/')[-1]}")
     print(f"Structure : {structure.split('/')[-1]}")
-    if not args.show_warning:
-        warnings.filterwarnings("ignore")
 
     # This part of the code only makes the subdirectories on which the user to run DFT.
     # To generate data for ECI fitting
@@ -555,6 +545,7 @@ if __name__ == '__main__':
                          NUM_INIT_TRIALS=args.init_trials,
                          bounds=bounds_sro,
                          constraints=constraints_sro,
+                         constr_tol=args.constr_tol,
                          corrs_trial=corr_rnd,
                          trial_variance=args.trial_variance,
                          display_inter= not args.no_inter,
@@ -593,22 +584,15 @@ if __name__ == '__main__':
 
     # This section has the same code as above. But does the fit following a full optimisation
     if args.skip_sro_fit:
-        print('Flag to skip SRO correction fitting as a function of T.')
+      print('Flag to skip SRO correction fitting as a function of T.')
     else:
-        print('Fitting SRO corrections to a function of T')
-        best_params = sro_T_fit(sro_T,
-                                args.degree,
-                                args.out,
-                                args.coeff_in,
-                                args.skip_expo,
-                                args.sro_method,
-                                args.verbose
-                                )
-
-        with open(f'{args.coeff_out}-{tdate}', 'w') as fout:
-            for d in range(args.degree+1):
-                c = best_params[f'coeff_{d}']
-                e = best_params[f'exp_{d}']
-                fout.write(f'{c},{e}\n')
-            bestC = best_params['C']
-            fout.write(f'{bestC},0')
+      print('Fitting SRO corrections to a function of T')
+      best_params, _ = sro_fit(func=sro_model,
+                               results=f'{structure}/{args.out}',
+                               coeff_in=f'{structure}/{args.coeff_in}',
+                               method=args.sro_method,
+                               loss=args.sro_loss,
+                               verbose=args.verbose
+                              )
+      np.savetxt(f'{structure}/{args.coeff_out}-{tdate}', best_params)
+      print('Finished SRO fitting.')
