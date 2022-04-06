@@ -2,10 +2,6 @@ import numpy as np
 import math
 
 kB = 8.617330337217213e-05
-
-def sro_model(T, a1, a2, a3, b1, b2, b3, C):
-  return -C*np.abs(1 + a1*np.exp(-b1/(kB*T)) + a2*np.exp(-b2/(kB*T)) + a3*np.exp(-b3/(kB*T)))
-
 def F_efficient(corrs, mults_eci, multconfig_kb, all_vmat, vect_rhologrho, temp):
 
     H = mults_eci @ corrs

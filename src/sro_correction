@@ -12,7 +12,6 @@ import subprocess
 from datetime import datetime
 
 import numpy as np
-import scipy as sp
 
 import optimiser as opt
 from constraints import Constraints
@@ -22,6 +21,7 @@ from fit_eci import fit_eci_scipy, fit_eci_lsfit, fit_eci_ransac
 from clusterdata import ClusterInfo
 from logger import Logger
 from sro_fit import sro_fit
+from sro_model import sro_model
 
 
 if __name__ == '__main__':
@@ -267,7 +267,6 @@ if __name__ == '__main__':
                                results=f'{structure}/{args.out}',
                                coeff_in=f'{structure}/{args.coeff_in}',
                                method=args.sro_method,
-                               verbose=args.verbose
                               )
       np.savetxt(f'{structure}/{args.coeff_out}-{tdate}', best_params)
       sys.exit('SRO Fit completed. Exiting..')
@@ -591,8 +590,6 @@ if __name__ == '__main__':
                                results=f'{structure}/{args.out}',
                                coeff_in=f'{structure}/{args.coeff_in}',
                                method=args.sro_method,
-                               loss=args.sro_loss,
-                               verbose=args.verbose
                               )
       np.savetxt(f'{structure}/{args.coeff_out}-{tdate}', best_params)
       print('Finished SRO fitting.')
