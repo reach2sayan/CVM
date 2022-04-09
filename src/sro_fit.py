@@ -2,7 +2,9 @@ import numpy as np
 from scipy.optimize import curve_fit
 import sys
 import json
+import inspect
 
+kB = 8.617333262e-05
 def sro_fit(func, results, coeff_in, method,):
     """
     Function to fit SRO correction as a function of T
@@ -31,7 +33,18 @@ def sro_fit(func, results, coeff_in, method,):
         print('File containing initial coefficients not found..taking defaults...')
         p0 = None
 
-    popt, pcov = curve_fit(f=func, xdata=xdata, ydata=ydata, method=method,)
+    popt, pcov = curve_fit(f=func, xdata=xdata, ydata=ydata, method=method,maxfev=5000)
+
+    for line in inspect.getsource(func).split('\n'):
+        if 'return' in line:
+            return_line = line.replace('return','').strip()
+    return_line_replaced = str(return_line)
+    for index, varname in enumerate(func.__code__.co_varnames[1:]):
+        return_line_replaced = return_line_replaced.replace(varname,f'{popt[index]}')
+
+    func_replace = {'np.exp':'EXP','np.abs':'ABS','kB':str(kB)}
+    for old_item, new_item in func_replace.items():
+        return_line_replaced = return_line_replaced.replace(old_item,new_item)
 
     xcont = np.linspace(min(xdata), max(xdata), 1000)[:, np.newaxis]
     ycont = func(xcont,*popt)
@@ -39,4 +52,4 @@ def sro_fit(func, results, coeff_in, method,):
     np.savetxt('sro_fitting_calculated.out',np.hstack((xcont, ycont)))
     np.savetxt('sro_fitting_data.out',np.hstack((xdata[:,np.newaxis], ydata[:,np.newaxis])))
 
-    return popt, pcov
+    return popt, pcov, return_line, return_line_replaced, func.__code__.co_varnames[1:]

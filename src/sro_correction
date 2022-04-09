@@ -258,30 +258,46 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     if not args.show_warning:
-      warnings.filterwarnings("ignore")
-    # This part of the code only fits the SRO correction vs T part.
-    # This section is repeated at the very end because I didn't want to write another wrapper for 20 lines of code.
-    if args.fit_sro_only:
-      print('Flag to fit SRO as a function of T only found. Skipping all optimisation Steps.')
-      best_params, _ = sro_fit(func=sro_model,
-                               results=f'{structure}/{args.out}',
-                               coeff_in=f'{structure}/{args.coeff_in}',
-                               method=args.sro_method,
-                              )
-      np.savetxt(f'{structure}/{args.coeff_out}-{tdate}', best_params)
-      sys.exit('SRO Fit completed. Exiting..')
-      # End of SRO correction fitting to T only
-    with open(f'{structure}/params-{tdate}.out','w') as fparam:
-      fparam.write("Param \t Value\n")
-      for name, value in args.__dict__.items():
-        fparam.write(f"{name}\t{value}\n")
+        warnings.filterwarnings("ignore")
+        # This part of the code only fits the SRO correction vs T part.
+        # This section is repeated at the very end because I didn't want to write another wrapper for 20 lines of code.
+        if args.fit_sro_only:
+            print('Flag to fit SRO as a function of T only found. Skipping all optimisation Steps.')
+            best_params, _, return_line, return_line_replaced, varnames = sro_fit(func=sro_model,
+                                                                                  results=f'{structure}/{args.out}',
+                                                                                  coeff_in=f'{structure}/{args.coeff_in}',
+                                                                                  method=args.sro_method,
+                                                                                 )
+            with open(f'{structure}/{args.coeff_out}-{tdate}','w') as fparams:
+                fparams.write(return_line+'\n')
+                for varname, param in zip(varnames, best_params):
+                    fparams.write(varname+'='+str(param)+'\n')
 
-    if args.no_constraint:
-        args.log = f'{args.log}-nocons-{tdate}'
-        args.out = f'{args.out}-nocons-{tdate}'
-    else:
-        args.log = f'{args.log}-cons-{tdate}'
-        args.out = f'{args.out}-cons-{tdate}'
+            #np.savetxt(f'{structure}/{args.coeff_out}-{tdate}', best_params)
+            with open(f'{structure}/func','w') as ffunc:
+                ffunc.write(return_line_replaced)
+            sys.exit('SRO Fit completed. Exiting..')
+
+#            print('Flag to fit SRO as a function of T only found. Skipping all optimisation Steps.')
+#            best_params, _ = sro_fit(func=sro_model,
+#                                       results=f'{structure}/{args.out}',
+#                                       coeff_in=f'{structure}/{args.coeff_in}',
+#                                       method=args.sro_method,
+#                                      )
+#            np.savetxt(f'{structure}/{args.coeff_out}-{tdate}', best_params)
+#            sys.exit('SRO Fit completed. Exiting..')
+#            # End of SRO correction fitting to T only
+#            with open(f'{structure}/params-{tdate}.out','w') as fparam:
+#                fparam.write("Param \t Value\n")
+#                for name, value in args.__dict__.items():
+#                    fparam.write(f"{name}\t{value}\n")
+
+        if args.no_constraint:
+            args.log = f'{args.log}-nocons-{tdate}'
+            args.out = f'{args.out}-nocons-{tdate}'
+        else:
+            args.log = f'{args.log}-cons-{tdate}'
+            args.out = f'{args.out}-cons-{tdate}'
 
 
     sys.stdout = Logger(sys.stdout, args.log, args.toscreen)
@@ -583,13 +599,21 @@ if __name__ == '__main__':
 
     # This section has the same code as above. But does the fit following a full optimisation
     if args.skip_sro_fit:
-      print('Flag to skip SRO correction fitting as a function of T.')
+        print('Flag to skip SRO correction fitting as a function of T.')
     else:
-      print('Fitting SRO corrections to a function of T')
-      best_params, _ = sro_fit(func=sro_model,
-                               results=f'{structure}/{args.out}',
-                               coeff_in=f'{structure}/{args.coeff_in}',
-                               method=args.sro_method,
-                              )
-      np.savetxt(f'{structure}/{args.coeff_out}-{tdate}', best_params)
-      print('Finished SRO fitting.')
+        print('Fitting SRO corrections to a function of T')
+        best_params, _, return_line, return_line_replaced, varnames = sro_fit(func=sro_model,
+                                                                              results=f'{structure}/{args.out}',
+                                                                              coeff_in=f'{structure}/{args.coeff_in}',
+                                                                              method=args.sro_method,
+                                                                              )
+        with open(f'{structure}/{args.coeff_out}-{tdate}','w') as fparams:
+            fparams.write(return_line+'\n')
+            for varname, param in zip(varnames, best_params):
+                fparams.write(varname+'='+str(param)+'\n')
+
+        #np.savetxt(f'{structure}/{args.coeff_out}-{tdate}', best_params)
+        with open(f'{structure}/func','w') as ffunc:
+            ffunc.write(return_line_replaced)
+    print('Finished SRO fitting.')
+    print('SRO Correction completed.')
