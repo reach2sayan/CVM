@@ -1,10 +1,16 @@
 import subprocess
 import numpy as np
 from scipy.linalg import lstsq, LinAlgError
+import argparse
+import os
+from pathlib import Path
+import sys
+from clusterdata import ClusterInfo
+
 try:
     from sklearn.linear_model import LinearRegression, RANSACRegressor
     from sklearn.metrics import mean_squared_error, r2_score
-except:
+except ImportError:
     print("scikit learn not found. Cannot use RANSACRegressor")
 
 def fit_eci_scipy(clusters_fit, correlations, energies, structure):
@@ -80,74 +86,101 @@ def fit_eci_ransac(clusters_fit, correlations, energies, structure):
     print(f'R2 score: {r2_score(energies_array[ransac.inlier_mask_], mults_corrs[ransac.inlier_mask_] @ ransac.estimator_.coef_ )}')
     return ransac.estimator_.coef_
 
+if __name__ == '__main__':
+
+    structure = os.getcwd()
+    path = Path(structure)
+    phase = str(path.parent.absolute())
+
+    parser = argparse.ArgumentParser(description='CVM SRO Error Correction Code by Sayan Samanta and Axel van de Walle',
+                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+                                    )
+
+    clus_fit_params = parser.add_argument_group(
+        "Parameters related to cluster fitting")
+    clus_fit_params.add_argument('--clusters',
+                                 default='clusters.out',
+                                 help="contain the cluster description for fitting the ECIs ",
+                                )
+    clus_fit_params.add_argument('--eci',
+                                 default='eci.out',
+                                 help="file to output fitted ECIs ",
+                                )
+    clus_fit_params.add_argument('--use_lsfit', '-lsfit',
+                                 action='store_true',
+                                 default=False,
+                                 help="Use ATAT lsfit to fit ECI",
+                                )
+    clus_fit_params.add_argument('--use_ransac', '-ransac',
+                                 action='store_true',
+                                 default=True,
+                                 help="Use sklearn RANSACRegressor ECI",
+                                )
+    clus_fit_params.add_argument('--reference_structures', '-ref',
+                                 default='references.in',
+                                 help="contains the names of the reference structures used to fit ECI",
+                                )
+    args = parser.parse_args()
+
+    print(
+        'Fitting ECIs.\n')
+    energies = {}
+    correlations = {}
+    try:
+        with open(f'{structure}/{args.reference_structures}', 'r') as fref:
+            reference_structures = [
+                structure.rstrip() for structure in fref.readlines()]
+    except FileNotFoundError as fnotf:
+        print(fnotf)
+        print(f"{args.reference_structures} not found. Exiting.\n")
+        sys.exit(1)
+
+    clusters = ClusterInfo(args.clusters, None, None, None, None, None,)
 
 
-## Copyright (c) 2004-2007, Andrew D. Straw. All rights reserved.
-## Redistribution and use in source and binary forms, with or without
-## modification, are permitted provided that the following conditions are
-## met:
-#
-## * Redistributions of source code must retain the above copyright
-## notice, this list of conditions and the following disclaimer.
-#
-## * Redistributions in binary form must reproduce the above
-## copyright notice, this list of conditions and the following
-## disclaimer in the documentation and/or other materials provided
-## with the distribution.
-#
-## * Neither the name of the Andrew D. Straw nor the names of its
-## contributors may be used to endorse or promote products derived
-## from this software without specific prior written permission.
-#
-## THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-## "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-## LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-## A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-## OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-## SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-## LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-## DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-## THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-## (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-## OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-#
-#
-#def fit_eci_ransac(clusters_fit, correlations, energies,
-#                   seed, min_points, max_iterations, threshold,
-#                   min_inliners,
-#                   ):
-#    """fit model parameters to data using the RANSAC algorithm
-#    This implementation written from pseudocode found at
-#    http://en.wikipedia.org/w/index.php?title=RANSAC&oldid=116358182
-#    Input:
-#        clusters_fit - cluster description for the fitting.
-#        correlations - dictionary containing all the correlations, index by the folder name
-#        energies     - corresponding energies also indexed by folder name
-#        seed         - random number seed for reprodubicle experiments
-#        basemodel    - a model that can be fitted to data points
-#        min_points   - the minimum number of data values required to fit the model
-#        max_iterations - the maximum number of iterations allowed in the algorithm
-#        threshold    - a threshold value for determining when a data point fits a model
-#        min_inliners - the number of close data values required to assert that a model fits well to data
-#    Output:
-#        Fitted ECIs.
-#        Note, this gets padded with zeros to match the number of clusters of the full cluster description but not here
-#    """
-#
-#    corrs, energies_array = map(np.array, zip(
-#        *[(correlations[key], energies[key]) for key in energies.keys()]))
-#    mults = np.array([clus['mult'] for clus in clusters_fit.clusters.values()])
-#    mults_corrs = corrs*mults
-#    data = np.c_[mults_corrs, energies_array]
-#
-#    ransac_basemodel = LinearLeastSquaresModel()
-#    ransac_regressor = RansacRegressor(base_model=ransac_basemodel,
-#                                       min_points=min_points,
-#                                       max_iterations=max_iterations,
-#                                       threshold=threshold,
-#                                       min_inliners=min_inliners,
-#                                       )
-#    print(vars(ransac_regressor))
-#    eci_fit, inliers = ransac_regressor.fit(data, seed)
-#
-#    return eci_fit, inliers
+    for struc in reference_structures:
+        try:
+            with open(f'{struc}/energy', 'r') as energy_file:
+                e = float(energy_file.readline())
+
+            num_atoms = sum(1 for line in open(f"{struc}/str.in")) - 6
+            energies[struc] = e/num_atoms
+            with open(f'{struc}/energy_atom', 'w') as feperatom:
+                feperatom.write(str(e/num_atoms))
+                corr = subprocess.run(['corrdump', '-c', f'-cf={structure}/{args.clusters_fit}', f'-s={struc}/str.in', f'-l={structure}/{args.lat}'],
+                                      stdout=subprocess.PIPE,
+                                      stderr=subprocess.PIPE,
+                                      check=True
+                                     )
+                # convert from bytes to string list
+                corr = corr.stdout.decode('utf-8').split('\t')[:-1]
+                corr = np.array(corr, dtype=np.float32)  # convert to arrays
+                assert corr[0] == 1
+                correlations[struc] = corr
+
+            print(f"Found structure {struc.split('/')[-1]} with energy : {e/num_atoms}")
+            print(f"Correlations {struc.split('/')[-1]} : {corr}\n")
+
+        except FileNotFoundError as fnotf:
+            print(fnotf)
+            print(
+                f"Energy of reference structure {struc.split('/')[-1]} not found. Probably some error in DFT calc")
+
+    if args.use_lsfit:
+        ecis = fit_eci_lsfit(
+            clusters, correlations, energies, structure)
+    elif args.use_ransac:
+        ecis = fit_eci_ransac(clusters,
+                                 correlations,
+                                 energies,
+                                 structure
+                                )
+
+    print(f'Fitted ECIs : {ecis}')
+    print(f'Writing Fitted ECIs to file {args.eci}')
+    with open(f'{args.eci}', 'w') as eci_file:
+        eci_file.write(f'{clusters.num_clusters}\n')
+        for eci in ecis:
+            eci_file.write(f'{eci}\n')
+
+    print('\n========================================\n')

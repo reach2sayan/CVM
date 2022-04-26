@@ -17,7 +17,6 @@ import optimiser as opt
 from constraints import Constraints
 from bounds import CorrBounds
 from energyfunctions import *
-from fit_eci import fit_eci_scipy, fit_eci_lsfit, fit_eci_ransac
 from clusterdata import ClusterInfo
 from logger import Logger
 from sro_fit import sro_fit
@@ -44,8 +43,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='CVM SRO Error Correction Code by Sayan Samanta and Axel van de Walle',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter,
                                      )
-    clus_fit_params = parser.add_argument_group(
-        "Parameters related to cluster fitting")
     opt_params = parser.add_argument_group("Optimisation Parameters")
     sro_fit_params = parser.add_argument_group(
         "Parameters related to fitting SRO as a function of temperature")
@@ -56,39 +53,6 @@ if __name__ == '__main__':
                         type=float,
                         help='set numpy random seed (for reproducible experiments)'
                         )
-    clus_fit_params.add_argument('--clusters_fit', '-cfit',
-                                 default='clusters_fit.out',
-                                 help="contain the cluster description for fitting the ECIs ",
-                                 )
-    clus_fit_params.add_argument('--use_lsfit', '-lsfit',
-                                 action='store_true',
-                                 default=False,
-                                 help="Use ATAT lsfit to fit ECI",
-                                )
-    clus_fit_params.add_argument('--use_ransac', '-ransac',
-                                 action='store_true',
-                                 default=True,
-                                 help="Use sklearn RANSACRegressor ECI",
-                                )
-    clus_fit_params.add_argument('--reference_structures', '-ref',
-                                 default='references.in',
-                                 help="contains the names of the reference structures used to fit ECI",
-                                 )
-    clus_fit_params.add_argument('--maximal_clusters', '-maxclus',
-                                 default='maxclus.in',
-                                 help="constains he name of the maximal cluster file",
-                                 )
-    clus_fit_params.add_argument('--fit_eci_only', '-feo',
-                                 action='store_true',
-                                 default=False,
-                                 help="Flag to only fit ECI and exit.",
-                                 )
-    clus_fit_params.add_argument('--skip_eci_fitting', '-sef',
-                                 action='store_true',
-                                 default=False,
-                                 help="Skips the ECI fitting step.",
-                                 )
-
     clus_params.add_argument('--eci',
                              default='eci.out',
                              help="file containing ECI's ",
@@ -104,7 +68,7 @@ if __name__ == '__main__':
     clus_params.add_argument('--clustermult',
                              default='clusmult.out',
                              help="file containing multiplicities for each cluster ",
-                            )
+                             )
     clus_params.add_argument('--kb',
                              default='configkb.out',
                              help="file containing the kikuchi-barker coefficients ",
@@ -136,6 +100,11 @@ if __name__ == '__main__':
                                 default=100,
                                 type=int,
                                 help="Temperature increment steps in which the SRO correction is to be evaluated "
+                                )
+    sro_fit_params.add_argument('--inJoules',
+                                action='store_true',
+                                default=False,
+                                help="Sets energy units to Joules/mol"
                                 )
     sro_fit_params.add_argument('--sro_method',
                                 default='lm',
@@ -169,16 +138,16 @@ if __name__ == '__main__':
                             type=float,
                             default=1e-5,
                             help="Value for minimum tolerance of constraints"
-                           )
+                            )
     opt_params.add_argument('--fit_ordered_only',
                             action='store_true',
                             default=False,
                             help="Flag to find find_ordered state only and exit."
-                           )
+                            )
     opt_params.add_argument('--linprog_method',
                             default='revised simplex',
                             help="Method of linear programming for findiing ordered correlations",
-                           )
+                            )
     opt_params.add_argument('--verbose', '-v', action='count', default=0,
                             help="Indicate the verbosity of the fit ",
                             )
@@ -186,12 +155,12 @@ if __name__ == '__main__':
                             action='store_true',
                             default=False,
                             help="Flag to enable estimation of derivatives",
-                           )
+                            )
     opt_params.add_argument('--no_inter',
                             action='store_true',
                             default=False,
                             help="Flag to enable if intermediate results should be displayed",
-                           )
+                            )
     opt_params.add_argument('--maxiter',
                             default=5000,
                             type=int,
@@ -201,12 +170,12 @@ if __name__ == '__main__':
                             default=1000000,
                             type=int,
                             help="Indicate maximum iterations for simplex procedure ",
-                           )
+                            )
     opt_params.add_argument('--earlystop',
                             default=25,
                             type=int,
                             help="Number of steps to break out of trials if no new minima has been found.",
-                           )
+                            )
     opt_params.add_argument('--xtol',
                             default=1e-12,
                             type=float,
@@ -221,12 +190,12 @@ if __name__ == '__main__':
                             default=0.01,
                             type=float,
                             help="Trial Varianec",
-                           )
+                            )
     opt_params.add_argument('--initial_tr_radius',
                             default=0.01,
                             type=float,
                             help="Indicate the acceptable violation of constraints ",
-                           )
+                            )
     opt_params.add_argument('--global_trials',
                             default=50,
                             type=int,
@@ -236,7 +205,7 @@ if __name__ == '__main__':
                             default=10000,
                             type=int,
                             help="Indicate maximum iterations for the local optimiser ",
-                           )
+                            )
     opt_params.add_argument('--show_warning',
                             action='store_true',
                             default=False,
@@ -257,71 +226,62 @@ if __name__ == '__main__':
                             )
 
     args = parser.parse_args()
+
     if not args.show_warning:
         warnings.filterwarnings("ignore")
-        # This part of the code only fits the SRO correction vs T part.
-        # This section is repeated at the very end because I didn't want to write another wrapper for 20 lines of code.
-        if args.fit_sro_only:
-            print('Flag to fit SRO as a function of T only found. Skipping all optimisation Steps.')
-            best_params, _, return_line, return_line_replaced, varnames = sro_fit(func=sro_model,
-                                                                                  results=f'{structure}/{args.out}',
-                                                                                  coeff_in=f'{structure}/{args.coeff_in}',
-                                                                                  method=args.sro_method,
-                                                                                 )
-            with open(f'{structure}/{args.coeff_out}-{tdate}','w') as fparams:
-                fparams.write(return_line+'\n')
-                for varname, param in zip(varnames, best_params):
-                    fparams.write(varname+'='+str(param)+'\n')
 
-            #np.savetxt(f'{structure}/{args.coeff_out}-{tdate}', best_params)
-            with open(f'{structure}/func','w') as ffunc:
-                ffunc.write(return_line_replaced)
-            sys.exit('SRO Fit completed. Exiting..')
+    with open(f'{structure}/energy', 'r') as energy_file:
+        e = float(energy_file.readline())
+    with open(f"{structure}/str.in", 'r') as str_out:
+        str_lines = str_out.readlines()
+    with open(f"{structure}/{args.lat}", 'r') as lat_out:
+        lat_lines = lat_out.readlines()
 
-#            print('Flag to fit SRO as a function of T only found. Skipping all optimisation Steps.')
-#            best_params, _ = sro_fit(func=sro_model,
-#                                       results=f'{structure}/{args.out}',
-#                                       coeff_in=f'{structure}/{args.coeff_in}',
-#                                       method=args.sro_method,
-#                                      )
-#            np.savetxt(f'{structure}/{args.coeff_out}-{tdate}', best_params)
-#            sys.exit('SRO Fit completed. Exiting..')
-#            # End of SRO correction fitting to T only
-#            with open(f'{structure}/params-{tdate}.out','w') as fparam:
-#                fparam.write("Param \t Value\n")
-#                for name, value in args.__dict__.items():
-#                    fparam.write(f"{name}\t{value}\n")
+    if len(str_lines[0].split(' ')) > 3:
+        num_str_atoms = len(str_lines) - 4
+    else:
+        num_str_atoms = len(str_lines) - 6
 
-        if args.no_constraint:
-            args.log = f'{args.log}-nocons-{tdate}'
-            args.out = f'{args.out}-nocons-{tdate}'
-        else:
-            args.log = f'{args.log}-cons-{tdate}'
-            args.out = f'{args.out}-cons-{tdate}'
+    if len(lat_lines[0].split(' ')) > 3:
+        num_lat_atoms = len(lat_lines) - 4
+    else:
+        num_lat_atoms = len(lat_lines) - 6
 
+    # This part of the code only fits the SRO correction vs T part.
+    # This section is repeated at the very end because I didn't want to write another wrapper for 20 lines of code.
+    if args.fit_sro_only:
+        print('Flag to fit SRO as a function of T only found. Skipping all optimisation Steps.')
+        best_params, _, return_line, return_line_replaced, varnames = sro_fit(func=sro_model,
+                                                                              results=f'{structure}/{args.out}',
+                                                                              coeff_in=f'{structure}/{args.coeff_in}',
+                                                                              len_struc=num_str_atoms,
+                                                                              inJoules=args.inJoules
+                                                                              )
+        with open(f'{structure}/{args.coeff_out}-{tdate}', 'w') as fparams:
+            fparams.write(return_line+'\n')
+            for varname, param in zip(varnames, best_params):
+                fparams.write(varname+'='+str(param)+'\n')
+
+        #np.savetxt(f'{structure}/{args.coeff_out}-{tdate}', best_params)
+        with open(f'{structure}/func', 'w') as ffunc:
+            ffunc.write(return_line_replaced)
+        sys.exit('SRO Fit completed. Exiting..')
+
+    if args.no_constraint:
+        args.log = f'{args.log}-nocons-{tdate}'
+        args.out = f'{args.out}-nocons-{tdate}'
+    else:
+        args.log = f'{args.log}-cons-{tdate}'
+        args.out = f'{args.out}-cons-{tdate}'
 
     sys.stdout = Logger(sys.stdout, args.log, args.toscreen)
-    print(f"Phase: {phase.split('/')[-1]}")
+
+    print(f"No. of atoms in primitive unit cell : {num_lat_atoms}")
+    print(f"No. of atoms in structure supercell : {num_str_atoms}")
+
+    print(f"Phase: {phase.rsplit('/',maxsplit=1)[-1]}")
     print(f"Structure : {structure.split('/')[-1]}")
 
-    # This part of the code only makes the subdirectories on which the user to run DFT.
-    # To generate data for ECI fitting
-    #if args.make_substructures_only:
-    #    print('Flag to create substructures only found.')
-    #    clfit = ClusterInfo(clusters_fname=f'{structure}/clusters_fit.out',)
-    #    print(
-    #        f'Found {clfit.num_clusters} no. of clusters to fit. Creating double as many structures...')
-    #    ref_list = open('references.in', 'w')
-    #    ref_list.write(".\n")
-    #    for label in range(clfit.num_clusters*args.mult_substructures):
-    #        create_structure(f'ecifit_{label}', args.percent_shuffle)
-    #        ref_list.write(f'ecifit_{label}\n')
-    #    ref_list.close()
-
-    #    sys.exit('Created substructures. Now exiting')
-    # End of substructure making only.
-
-    # Generate Full Cluster Description
     try:
         _ = subprocess.run(['cvmclus', f'-m={phase}/{args.maximal_clusters}', f'-l={structure}/{args.lat}'],
                            stdout=subprocess.PIPE,
@@ -343,96 +303,10 @@ if __name__ == '__main__':
                                 eci_fname=f'{structure}/{args.eci}',
                                 )
 
-    # This section of the code either chooses to skip fitting ECIs
-    # Or go ahead, read from substructures to do the ECI fit
-    if args.skip_eci_fitting:
-        print(f"Skipping ECI fitting step. Using {args.eci} instead")
-        print(clusters_full.eci)
-    else:
-        print('\n===================================================\n')
-        print(
-            'Fitting ECIs.\n')
-        energies = {}
-        correlations = {}
-        try:
-            with open(f'{structure}/{args.reference_structures}', 'r') as fref:
-                reference_structures = [
-                    structure.rstrip() for structure in fref.readlines()]
-        except FileNotFoundError as fnotf:
-            print(fnotf)
-            print(f"{args.reference_structures} not found. Exiting.\n")
-            sys.exit(1)
-
-        clusters_fit = ClusterInfo(
-            args.clusters_fit, None, None, None, None, None,)
-
-
-        for struc in reference_structures:
-            try:
-                with open(f'{struc}/energy', 'r') as energy_file:
-                    e = float(energy_file.readline())
-
-                num_atoms = sum(1 for line in open(f"{struc}/str.in")) - 6
-                energies[struc] = e/num_atoms
-                with open(f'{struc}/energy_atom', 'w') as feperatom:
-                    feperatom.write(str(e/num_atoms))
-                corr = subprocess.run(['corrdump', '-c', f'-cf={structure}/{args.clusters_fit}', f'-s={struc}/str.in', f'-l={structure}/{args.lat}'],
-                                      stdout=subprocess.PIPE,
-                                      stderr=subprocess.PIPE,
-                                      check=True
-                                      )
-                # convert from bytes to string list
-                corr = corr.stdout.decode('utf-8').split('\t')[:-1]
-                corr = np.array(corr, dtype=np.float32)  # convert to arrays
-                assert corr[0] == 1
-                correlations[struc] = corr
-
-                print(f"Found structure {struc.split('/')[-1]} with energy : {e/num_atoms}")
-                print(f"Correlations {struc.split('/')[-1]} : {corr}\n")
-
-            except FileNotFoundError as fnotf:
-                print(fnotf)
-                print(
-                    f"Energy of reference structure {struc.split('/')[-1]} not found. Probably some error in DFT calc")
-        
-        if args.use_lsfit:
-            eci_tmp = fit_eci_lsfit(
-                clusters_fit, correlations, energies, structure)
-        elif args.use_ransac:
-            eci_tmp = fit_eci_ransac(clusters_fit,
-                                     correlations,
-                                     energies,
-                                     structure
-                                    )
-        eci_tmp = np.array(
-            [*eci_tmp, *np.zeros(clusters_full.num_clusters - clusters_fit.num_clusters)])
-        for index, eci in clusters_full.eci.items():
-            clusters_full.eci[index] = eci_tmp[index]
-
-        print(f'Fitted ECIs : {clusters_full.eci}')
-        print(f'Writing Fitted ECIs to file {args.eci}')
-        with open(f'{args.eci}', 'w') as eci_file:
-            eci_file.write(f'{clusters_full.num_clusters}\n')
-            for _, eci in clusters_full.eci.items():
-                eci_file.write(f'{eci}\n')
-
-        print('\n========================================\n')
-
-        for eci, cluster_idx in zip(eci_tmp, clusters_full.clusters.keys()):
-            clusters_full.eci[cluster_idx] = eci
-
-    if args.fit_eci_only:
-        sys.exit('Flag to fit only detected. Exiting now...')
-    # End ECI fitting
-
-    with open(f'{structure}/energy', 'r') as energy_file:
-      e = float(energy_file.readline())
-
-    num_atoms = sum(1 for line in open(f"{structure}/str.in")) - 6
-    F_sqs = e/num_atoms
+    F_sqs = e
     with open(f'{structure}/energy_atom', 'w') as feperatom:
-      feperatom.write(str(F_sqs))
-      print(f"Read in SQS energy\t: {F_sqs:.4f}")
+        feperatom.write(str(F_sqs/num_str_atoms))
+        print(f"Read in SQS energy\t: {F_sqs/num_str_atoms:.4f}")
 
     results_sro = []
     corr_rnd = subprocess.run(['corrdump', '-c', f'-cf={structure}/{args.clusters}', f'-s={structure}/str.in', f'-l={structure}/{args.lat}', '-rnd'],
@@ -445,7 +319,7 @@ if __name__ == '__main__':
     corr_rnd = np.array(corr_rnd, dtype=np.float32)  # convert to arrays
     assert corr_rnd[0] == 1
     assert clusters_full.check_result_validity(corr_rnd)
-    np.savetxt('disordered_correlations.out',corr_rnd)
+    np.savetxt('disordered_correlations.out', corr_rnd)
 
     FIXED_CORRS = corr_rnd[clusters_full.single_point_clusters]
     constraints = Constraints(clusters_full)
@@ -464,7 +338,7 @@ if __name__ == '__main__':
     options = {'disp': bool(args.verbose),
                'maxiter': args.maxiter_simplex,
                'tol': args.xtol,
-              }
+               }
 
     if Path(f"{structure}/ordered_correlations.out").is_file():
         print("File containing ordered correlations read.")
@@ -483,12 +357,12 @@ if __name__ == '__main__':
                                       corr=corr_rnd,
                                       method=args.linprog_method,
                                       options=options,
-                                     )
+                                      )
         corr_ord = result_ord.x
         E_ord = result_ord.fun
 
     print(f"Ordered correlation\t: {corr_ord}")
-    print(f"Ordered Energy\t: {E_ord}") 
+    print(f"Ordered Energy (in eV/atom)\t: {E_ord/num_lat_atoms}")
     print("Ordered Rho:\n")
     clusters_full.print_rho(corr_ord)
     print()
@@ -523,16 +397,18 @@ if __name__ == '__main__':
                   T,
                   clusters_full.eci)
         F_ord = F(corr_ord,
-            clusters_full.vmat,
-            clusters_full.kb,
-            clusters_full.clusters,
-            clusters_full.clustermult,
-            clusters_full.configmult,
-            T,
-            clusters_full.eci)
-        print(f"Ordered CVM Free energy @ T = {T}K\t: {F_ord}")
+                  clusters_full.vmat,
+                  clusters_full.kb,
+                  clusters_full.clusters,
+                  clusters_full.clustermult,
+                  clusters_full.configmult,
+                  T,
+                  clusters_full.eci)
+        print(
+            f"Ordered CVM Free energy (eV/atom) @ T = {T}K\t: {F_ord/num_lat_atoms}")
         print(f"Ordered Correlations @ T = {T}K\t: {corr_ord}")
-        print(f"Disordered CVM Free energy @ T = {T}K\t: {F_rnd}")
+        print(
+            f"Disordered CVM Free energy (eV/atom) @ T = {T}K\t: {F_rnd/num_lat_atoms}")
         print(f"Disordered Correlations @ T = {T}K\t: {corr_rnd}")
 
         if args.no_constraint:
@@ -547,7 +423,7 @@ if __name__ == '__main__':
                    'maxiter': args.maxiter,
                    'xtol': args.xtol,
                    'gtol': args.gtol,
-                   'initial_tr_radius' :args.initial_tr_radius
+                   'initial_tr_radius': args.initial_tr_radius
                    }
 
         result = opt.fit(F=F_efficient,
@@ -563,30 +439,33 @@ if __name__ == '__main__':
                          constr_tol=args.constr_tol,
                          corrs_trial=corr_rnd,
                          trial_variance=args.trial_variance,
-                         display_inter= not args.no_inter,
+                         display_inter=not args.no_inter,
                          approx_deriv=args.approx_deriv,
                          seed=args.seed,
                          early_stopping_cond=args.earlystop,
                          ord2disord_dist=ord2disord_dist
                          )
         F_cvm = result.fun
-        print(f"Optimised CVM Free energy @ T = {T}K\t: {F_cvm}")
+        print(
+            f"Optimised CVM Free energy (eV/atom) @ T = {T}K\t: {F_cvm/num_lat_atoms}")
         print(f"Optimised Correlation @ T = {T}K\t: {result.x}")
         print(f"Constraint Violation: {result.constr_violation}")
-        print(f"Optimised Free energy Gradient: {np.array2string(result.grad)}")
+        print(
+            f"Optimised Free energy Gradient: {np.array2string(result.grad)}")
         print("Optimised Rhos:")
         clusters_full.print_rho(result.x)
         print("\n#################################################")
-        F_solid_solution = F_sqs + F_cvm - F_rnd
+        F_solid_solution = F_sqs/num_str_atoms + \
+            (F_cvm/num_lat_atoms - F_rnd/num_lat_atoms)
         results_sro.append({'structure': structure.split('/')[-1],
                             'temperature': T,
                             'corrs': list(result.x),
-                            'F_sqs': F_sqs,
-                            'F_rnd': F_rnd,
-                            'F_cvm': F_cvm,
+                            'F_sqs': F_sqs/num_str_atoms,
+                            'F_rnd': F_rnd/num_lat_atoms,
+                            'F_cvm': F_cvm/num_lat_atoms,
                             'distance': ord2disord_dist/2 - np.linalg.norm(result.x - corr_rnd)
-                           }
-                          )
+                            }
+                           )
         corrcols = [f'corr {i}' for i in range(clusters_full.num_clusters)]
         for item in results_sro:
             for idx, corrnum in enumerate(corrcols):
@@ -605,15 +484,15 @@ if __name__ == '__main__':
         best_params, _, return_line, return_line_replaced, varnames = sro_fit(func=sro_model,
                                                                               results=f'{structure}/{args.out}',
                                                                               coeff_in=f'{structure}/{args.coeff_in}',
-                                                                              method=args.sro_method,
+                                                                              len_struc=num_str_atoms,
+                                                                              inJoules=args.inJoules
                                                                               )
-        with open(f'{structure}/{args.coeff_out}-{tdate}','w') as fparams:
+        with open(f'{structure}/{args.coeff_out}-{tdate}', 'w') as fparams:
             fparams.write(return_line+'\n')
             for varname, param in zip(varnames, best_params):
                 fparams.write(varname+'='+str(param)+'\n')
 
-        #np.savetxt(f'{structure}/{args.coeff_out}-{tdate}', best_params)
-        with open(f'{structure}/func','w') as ffunc:
+        with open(f'{structure}/func', 'w') as ffunc:
             ffunc.write(return_line_replaced)
     print('Finished SRO fitting.')
     print('SRO Correction completed.')

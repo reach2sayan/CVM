@@ -46,7 +46,7 @@ def plot_eci_fit(energy_file='ref_energies.in',
 
 def plot_sro_fit(data_file='sro_fitting_data.out',
                  pred_file='sro_fitting_calculated.out',
-                 img_name='cvmfit.png'
+                 img_name='cvmfit.svg'
                  ):
     try:
         data = np.loadtxt(data_file)
@@ -61,23 +61,9 @@ def plot_sro_fit(data_file='sro_fitting_data.out',
     plt.grid()
     plt.xlabel('Temperature (in K)')
     plt.ylabel('SRO Correction')
-    with open('func','r') as ffunc:
-        func = ffunc.readlines()[0].strip()
-    plt.text(4, 1, func, ha='left', rotation=15, wrap=True)
 
     plt.tight_layout()
     plt.savefig(img_name, dpi=300)
-
-   # plt.plot(xdata, ydata, '.', label='data')
-   # plt.plot(xr, yr, label='fit')
-   # plt.suptitle(f"SRO Correction {phase.split('/')[-1]} :: {structure.split('/')[-1]}")
-   # plt.xlabel('T')
-   # plt.ylabel(r'F$_{cvm}$ - F$_{disordered}$')
-   # plt.grid(True)
-   # plt.legend()
-   # plt.tight_layout()
-   # plt.savefig(img_name, dpi=300)
-
 
 if __name__ == '__main__':
 
