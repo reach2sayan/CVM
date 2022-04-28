@@ -63,8 +63,12 @@ if __name__ == '__main__':
                              )
     clus_params.add_argument('--clusters', '-cl',
                              default='clusters.out',
-                             help="file contain the maximal cluster description ",
+                             help="file contain the name of the cluster file",
                              )
+    clus_params.add_argument('--maximal_clusters', '-cl',
+                             default='maxclus.in',
+                             help="file contain the maximal cluster description ",
+                            )
     clus_params.add_argument('--clustermult',
                              default='clusmult.out',
                              help="file containing multiplicities for each cluster ",
@@ -250,6 +254,8 @@ if __name__ == '__main__':
     # This part of the code only fits the SRO correction vs T part.
     # This section is repeated at the very end because I didn't want to write another wrapper for 20 lines of code.
     if args.fit_sro_only:
+        print(f"No. of atoms in primitive unit cell : {num_lat_atoms}")
+        print(f"No. of atoms in structure supercell : {num_str_atoms}")
         print('Flag to fit SRO as a function of T only found. Skipping all optimisation Steps.')
         best_params, _, return_line, return_line_replaced, varnames = sro_fit(func=sro_model,
                                                                               results=f'{structure}/{args.out}',
