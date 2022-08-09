@@ -40,7 +40,7 @@ def sro_fit(func, results, coeff_in, len_struc, inJoules=False):
         print('File containing initial coefficients not found..taking defaults...')
         p0 = None
 
-    popt, pcov = curve_fit(f=func, xdata=xdata, ydata=ydata, p0=p0,method='dogbox', maxfev=10000000)
+    popt, pcov = curve_fit(f=func, xdata=xdata, ydata=ydata, p0=p0,method='lm', maxfev=10000000)
 
     for line in inspect.getsource(func).split('\n'):
         if 'return' in line:

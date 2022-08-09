@@ -65,7 +65,7 @@ if __name__ == '__main__':
                              default='clusters.out',
                              help="file contain the name of the cluster file",
                              )
-    clus_params.add_argument('--maximal_clusters', '-cl',
+    clus_params.add_argument('--maximal_clusters',
                              default='maxclus.in',
                              help="file contain the maximal cluster description ",
                             )
