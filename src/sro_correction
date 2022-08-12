@@ -140,7 +140,7 @@ if __name__ == '__main__':
                             )
     opt_params.add_argument('--constr_tol',
                             type=float,
-                            default=1e-5,
+                            default=1e-10,
                             help="Value for minimum tolerance of constraints"
                             )
     opt_params.add_argument('--fit_ordered_only',

@@ -16,11 +16,11 @@ def find_ordered(cluster_data, corr, method, options, fix_point=True, print_outp
     Input:
         cluster_data - ClusterInfo object contatning vmat, eci and cluster information
         corr - sample corr, only used as a guess for the refined simplex method. This also
-               specified the point correlations that are kept fixed.
+        specified the point correlations that are kept fixed.
         method - method of the linear programming; simplex or interior point
         options - extra options for the linear programming problem
-    Output
-    """
+        Output
+        """
 
     all_vmat = -1 * np.vstack([vmat for vmat in cluster_data.vmat.values()])
     vmat_limit = np.zeros(all_vmat.shape[0])
@@ -44,7 +44,7 @@ def find_ordered(cluster_data, corr, method, options, fix_point=True, print_outp
                      bounds=corr_bounds,
                      options=options,
                      method=method
-                     )
+                    )
     if result.success:
         print('Ordered State calculations completed...')
         if print_output:
@@ -78,7 +78,7 @@ def fit(F,
         early_stopping_cond=np.inf,
         ord2disord_dist=0.0,
         constraint=True
-        ):
+       ):
     """
     Functions takes in all required inputs :
         1. Functions and derivatives (if available),
@@ -86,7 +86,7 @@ def fit(F,
         3. bounds and constraints,
         4. Cluster Information
         4. Other fitting parameters
-    and returns the minimised set of values for the particular section of the CVM correction pipeline.
+        and returns the minimised set of values for the particular section of the CVM correction pipeline.
     """
     rng = np.random.default_rng(seed)
     result = None
@@ -150,57 +150,77 @@ def fit(F,
                                                        )
 
         print(f'{trial}:', end='\r')
-        temp_results = minimize(F,
-                                corrs_attempt,
-                                method='trust-constr',
-                                args=(
-                                    mults_eci,
-                                    multconfig_kb,
-                                    all_vmat,
-                                    vrhologrho,
-                                    temp,
-                                ),
-                                options=options,
-                                jac=jac,
-                                hess=hess,
-                                constraints=constraints,
-                                bounds=bounds,
-                                )
+        try:
+            temp_results = minimize(F,
+                                    corrs_attempt,
+                                    method='trust-constr',
+                                    args=(
+                                        mults_eci,
+                                        multconfig_kb,
+                                        all_vmat,
+                                        vrhologrho,
+                                        temp,
+                                    ),
+                                    options=options,
+                                    jac=jac,
+                                    hess=hess,
+                                    constraints=constraints,
+                                    bounds=bounds,
+                                   )
+        except np.linalg.LinAlgError as linalg_err:
+
+            print(linalg_err)
+            options['factorisation_method'] = 'NormalEquation'
+            temp_results = minimize(F,
+                                    corrs_attempt,
+                                    method='trust-constr',
+                                    args=(
+                                        mults_eci,
+                                        multconfig_kb,
+                                        all_vmat,
+                                        vrhologrho,
+                                        temp,
+                                    ),
+                                    options=options,
+                                    jac=jac,
+                                    hess=hess,
+                                    constraints=constraints,
+                                    bounds=bounds,
+                                   )
 
         if temp_results.fun > fattempt:
-          options['initial_tr_radius'] = options['initial_tr_radius']/10
-          if display_inter:
-              print(
-                f"Optimising Initial trust radius from {options['initial_tr_radius']*10:.2E} -->  {options['initial_tr_radius']:.2E}")
-              #pass
-          trial -= 1
+            options['initial_tr_radius'] = options['initial_tr_radius']/10
+            if display_inter:
+                print(
+                    f"Optimising Initial trust radius from {options['initial_tr_radius']*10:.2E} -->  {options['initial_tr_radius']:.2E}")
+                trial -= 1
 
         elif temp_results.fun < result_value and temp_results.constr_violation < constr_tol: 
-          found_optim_radius = True
-          try:
-              assert not np.all(np.isnan(temp_results.grad))
-          except AssertionError:
-              print('Gradient blew up!! Incorrect solution. Moving on...')
-              continue
+            found_optim_radius = True
+            try:
+                assert not np.all(np.isnan(temp_results.grad))
+            except AssertionError:
+                print('Gradient blew up!! Incorrect solution. Moving on...')
+                continue
 
-          steps_b4_mini = 0
-          result = temp_results
-          result_value = temp_results.fun
-
-          if display_inter:
-              print(f'Attempt Energy: {fattempt}')
-              print(f'Current Energy: {temp_results.fun}')
-              print(f'Current minimum correlations: {temp_results.x}')
-              print(f"Gradient: {np.array2string(temp_results.grad)}")
-              print(f"Constraint Violation: {temp_results.constr_violation}")
-              print(f"Current Trust Radius: {temp_results.tr_radius}")
-              print(
-                  f"Stop Status: {temp_results.status} | {temp_results.message}")
-              print('\n====================================\n')
+        steps_b4_mini = 0
+        result = temp_results
+        result_value = temp_results.fun
+        if display_inter:
+            print(f'Attempt Energy: {fattempt}')
+            print(f'Current Energy: {temp_results.fun}')
+            print(f'Current minimum correlations: {temp_results.x}')
+            print(f"Gradient: {np.array2string(temp_results.grad)}")
+            print(f"Constraint Violation: {temp_results.constr_violation}")
+            print(f"Current Trust Radius: {temp_results.tr_radius}")
+            print(
+                f"Stop Status: {temp_results.status} | {temp_results.message}")
+            print('\n====================================\n')
 
         elif temp_results.status == 0:
-          print(
-            f"Stop Status: {temp_results.status} | {temp_results.message}")
+            print(
+              f"Stop Status: {temp_results.status} | {temp_results.message}")
+
         else:
             steps_b4_mini += 1
 
@@ -209,7 +229,7 @@ def fit(F,
                 f'No improvement for {early_stopping_cond} steps. After half of max steps ({NUM_TRIALS}) were done.')
             if result is None:
                 print("WARNING: Current value of the minimisation is None. Something must be wrong with the simulation parameters. Please check.")
-            break
+                break
 
         trial += 1
 
