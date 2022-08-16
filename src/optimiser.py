@@ -170,23 +170,9 @@ def fit(F,
         except np.linalg.LinAlgError as linalg_err:
 
             print(linalg_err)
-            options['factorisation_method'] = 'NormalEquation'
-            temp_results = minimize(F,
-                                    corrs_attempt,
-                                    method='trust-constr',
-                                    args=(
-                                        mults_eci,
-                                        multconfig_kb,
-                                        all_vmat,
-                                        vrhologrho,
-                                        temp,
-                                    ),
-                                    options=options,
-                                    jac=jac,
-                                    hess=hess,
-                                    constraints=constraints,
-                                    bounds=bounds,
-                                   )
+            print('trying a different starting point')
+            trial -= 1
+            continue
 
         if temp_results.fun > fattempt:
             options['initial_tr_radius'] = options['initial_tr_radius']/10
@@ -203,19 +189,19 @@ def fit(F,
                 print('Gradient blew up!! Incorrect solution. Moving on...')
                 continue
 
-        steps_b4_mini = 0
-        result = temp_results
-        result_value = temp_results.fun
-        if display_inter:
-            print(f'Attempt Energy: {fattempt}')
-            print(f'Current Energy: {temp_results.fun}')
-            print(f'Current minimum correlations: {temp_results.x}')
-            print(f"Gradient: {np.array2string(temp_results.grad)}")
-            print(f"Constraint Violation: {temp_results.constr_violation}")
-            print(f"Current Trust Radius: {temp_results.tr_radius}")
-            print(
-                f"Stop Status: {temp_results.status} | {temp_results.message}")
-            print('\n====================================\n')
+            steps_b4_mini = 0
+            result = temp_results
+            result_value = temp_results.fun
+            if display_inter:
+                print(f'Attempt Energy: {fattempt}')
+                print(f'Current Energy: {temp_results.fun}')
+                print(f'Current minimum correlations: {temp_results.x}')
+                print(f"Gradient: {np.array2string(temp_results.grad)}")
+                print(f"Constraint Violation: {temp_results.constr_violation}")
+                print(f"Current Trust Radius: {temp_results.tr_radius}")
+                print(
+                    f"Stop Status: {temp_results.status} | {temp_results.message}")
+                print('\n====================================\n')
 
         elif temp_results.status == 0:
             print(
