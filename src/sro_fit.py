@@ -11,7 +11,7 @@ from sympy.parsing.sympy_parser import (
 from sympy import *
 
 eV2J = 96491.5666370759
-def sro_fit(func, results, coeff_in, len_struc, inJoules=False):
+def sro_fit(func, results, coeff_in, inJoules=False):
     """
     Function to fit SRO correction as a function of T
     Inputs:
@@ -33,7 +33,7 @@ def sro_fit(func, results, coeff_in, len_struc, inJoules=False):
     xdata = np.array([item.get('temperature') for item in data if item.get('temperature') != 0])
     ydata = np.array([item.get('F_cvm') - item.get('F_rnd') for item in data if item.get('temperature') != 0])
     if inJoules:
-        ydata = ydata*eV2J*len_struc
+        ydata = ydata*eV2J
     try:
         p0 = np.loadtxt(coeff_in)
     except OSError:

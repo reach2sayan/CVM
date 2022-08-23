@@ -260,7 +260,6 @@ if __name__ == '__main__':
         best_params, _, return_line, return_line_replaced, varnames = sro_fit(func=sro_model,
                                                                               results=f'{structure}/{args.out}',
                                                                               coeff_in=f'{structure}/{args.coeff_in}',
-                                                                              len_struc=num_str_atoms,
                                                                               inJoules=args.inJoules
                                                                               )
         with open(f'{structure}/{args.coeff_out}-{tdate}', 'w') as fparams:
@@ -490,7 +489,6 @@ if __name__ == '__main__':
         best_params, _, return_line, return_line_replaced, varnames = sro_fit(func=sro_model,
                                                                               results=f'{structure}/{args.out}',
                                                                               coeff_in=f'{structure}/{args.coeff_in}',
-                                                                              len_struc=num_str_atoms,
                                                                               inJoules=args.inJoules
                                                                               )
         with open(f'{structure}/{args.coeff_out}-{tdate}', 'w') as fparams:
