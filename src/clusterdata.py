@@ -250,9 +250,11 @@ class ClusterInfo:
                 eci[idx] = float(eci_val)
         except (FileNotFoundError, TypeError):
             if eci_fname is not None:
+                print('WARNINGGGGGGGG.....')
                 print(
                     f"No pre-existing {eci_fname.split('/')[-1]} file found. Instantiating with all zeros")
             else:
+                print('WARNINGGGGGGGG.....')
                 print(
                     f"Instantiating ECI with all zeros")
 

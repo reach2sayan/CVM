@@ -91,7 +91,7 @@ def fit(F,
     rng = np.random.default_rng(seed)
     result = None
     result_value = 1e5
-    constr_viol = 1e5
+    constr_viol = 1e-10
 
     mult_arr = np.array(list(cluster_data.clustermult.values()))
     eci_arr = np.array(list(cluster_data.eci.values()))
@@ -174,6 +174,7 @@ def fit(F,
             trial -= 1
             continue
 
+
         if temp_results.fun > fattempt:
             options['initial_tr_radius'] = options['initial_tr_radius']/10
             if display_inter:
@@ -181,7 +182,11 @@ def fit(F,
                     f"Optimising Initial trust radius from {options['initial_tr_radius']*10:.2E} -->  {options['initial_tr_radius']:.2E}")
                 trial -= 1
 
-        elif temp_results.fun < result_value and temp_results.constr_violation < constr_tol: 
+        elif result is None:
+            print('Setting results to the first optimization...')
+            result = temp_results
+
+        elif temp_results.constr_violation < constr_tol and temp_results.fun < result_value: 
             found_optim_radius = True
             try:
                 assert not np.all(np.isnan(temp_results.grad))
@@ -203,19 +208,14 @@ def fit(F,
                     f"Stop Status: {temp_results.status} | {temp_results.message}")
                 print('\n====================================\n')
 
-        elif temp_results.status == 0:
-            print(
-              f"Stop Status: {temp_results.status} | {temp_results.message}")
-
         else:
             steps_b4_mini += 1
 
-        if trial > NUM_TRIALS/2 and steps_b4_mini > early_stopping_cond:
-            print(
-                f'No improvement for {early_stopping_cond} steps. After half of max steps ({NUM_TRIALS}) were done.')
-            if result is None:
-                print("WARNING: Current value of the minimisation is None. Something must be wrong with the simulation parameters. Please check.")
+            if trial > NUM_TRIALS/2 and steps_b4_mini > early_stopping_cond:
+                print(
+                    f'No improvement for {early_stopping_cond} steps. After half of max steps ({NUM_TRIALS}) were done.')
                 break
+
 
         trial += 1
 
