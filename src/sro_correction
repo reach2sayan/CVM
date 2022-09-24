@@ -336,8 +336,6 @@ if __name__ == '__main__':
     # Is skipped if no norm constraint if requried
     if args.no_constraint:
         print("Norm Constraint not activated.\n")
-        print("Turning off SRO fit flag since constraint is not activated.\n")
-        args.skip_sro_fit = True
     else:
         print("Norm Constraint activated...\n")
 

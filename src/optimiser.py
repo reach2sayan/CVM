@@ -182,9 +182,6 @@ def fit(F,
                     f"Optimising Initial trust radius from {options['initial_tr_radius']*10:.2E} -->  {options['initial_tr_radius']:.2E}")
                 trial -= 1
 
-        elif result is None:
-            print('Setting results to the first optimization...')
-            result = temp_results
 
         elif temp_results.constr_violation < constr_tol and temp_results.fun < result_value: 
             found_optim_radius = True
@@ -207,6 +204,10 @@ def fit(F,
                 print(
                     f"Stop Status: {temp_results.status} | {temp_results.message}")
                 print('\n====================================\n')
+
+        elif result is None:
+            print('Setting results to the first optimization...')
+            result = temp_results
 
         else:
             steps_b4_mini += 1
