@@ -190,6 +190,11 @@ if __name__ == '__main__':
                             type=float,
                             help="Indicate the acceptable violation of constraints ",
                             )
+    opt_params.add_argument('--random_trial',
+                            action='store_true',
+                            default=False,
+                            help="Acivates picking any random trial corr",
+                            )
     opt_params.add_argument('--trial_variance',
                             default=0.01,
                             type=float,
@@ -338,6 +343,8 @@ if __name__ == '__main__':
         print("Norm Constraint not activated.\n")
     else:
         print("Norm Constraint activated...\n")
+    if args.random_trial:
+        print('Random Trial Flag On.')
 
     options = {'disp': bool(args.verbose),
                'maxiter': args.maxiter_simplex,
@@ -443,6 +450,7 @@ if __name__ == '__main__':
                          constr_tol=args.constr_tol,
                          corrs_trial=corr_rnd,
                          trial_variance=args.trial_variance,
+                         random_trial=args.random_trial,
                          display_inter=not args.no_inter,
                          approx_deriv=args.approx_deriv,
                          seed=args.seed,

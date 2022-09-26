@@ -72,6 +72,7 @@ def fit(F,
         constr_tol,
         corrs_trial,
         trial_variance,
+        random_trial=False,
         display_inter=False,
         approx_deriv=True,
         seed=42,
@@ -120,17 +121,20 @@ def fit(F,
     while trial < NUM_TRIALS:  # al in range(NUM_TRIALS):
 
         if found_optim_radius:
-            jitter = np.array([0,
-                               *[0] *
-                               len(cluster_data.single_point_clusters),
-                               *rng.normal(0,
-                                           trial_variance,
-                                           cluster_data.num_clusters -
-                                           len(cluster_data.single_point_clusters) - 1
-                                          )
-                              ]
-                             )
-            corrs_attempt = corrs_trial+jitter
+            if random_trial:
+                corrs_trial = np.array([*corrs_trial[:len(cluster_data.single_point_clusters)+1],*rng.uniform(low=-1,high=1,size=cluster_data.num_clusters - len(cluster_data.single_point_clusters) - 1)])
+            else:
+                jitter = np.array([0,
+                                   *[0] *
+                                   len(cluster_data.single_point_clusters),
+                                   *rng.normal(0,
+                                               trial_variance,
+                                               cluster_data.num_clusters -
+                                               len(cluster_data.single_point_clusters) - 1
+                                              )
+                                  ]
+                                 )
+                corrs_attempt = corrs_trial+jitter
             fattempt = F(corrs_attempt,
                          mults_eci,
                          multconfig_kb,
@@ -212,7 +216,7 @@ def fit(F,
         else:
             steps_b4_mini += 1
 
-            if trial > NUM_TRIALS/2 and steps_b4_mini > early_stopping_cond:
+            if steps_b4_mini > early_stopping_cond:
                 print(
                     f'No improvement for {early_stopping_cond} steps. After half of max steps ({NUM_TRIALS}) were done.')
                 break
