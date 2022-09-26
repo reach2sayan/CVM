@@ -123,6 +123,7 @@ def fit(F,
         if found_optim_radius:
             if random_trial:
                 corrs_trial = np.array([*corrs_trial[:len(cluster_data.single_point_clusters)+1],*rng.uniform(low=-1,high=1,size=cluster_data.num_clusters - len(cluster_data.single_point_clusters) - 1)])
+                corrs_attempt = corrs_trial
             else:
                 jitter = np.array([0,
                                    *[0] *
