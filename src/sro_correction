@@ -458,6 +458,8 @@ if __name__ == '__main__':
                          ord2disord_dist=ord2disord_dist
                          )
         F_cvm = result.fun
+        print(f"Disordered CVM Free energy (eV/atom) @ T = {T}K\t: {F_rnd/num_lat_atoms}")
+        print(f"Ordered CVM Free energy (eV/atom) @ T = {T}K\t: {F_ord/num_lat_atoms}")
         print(
             f"Optimised CVM Free energy (eV/atom) @ T = {T}K\t: {F_cvm/num_lat_atoms}")
         print(f"Optimised Correlation @ T = {T}K\t: {result.x}")
@@ -472,7 +474,9 @@ if __name__ == '__main__':
         results_sro.append({'structure': structure.split('/')[-1],
                             'temperature': T,
                             'corrs': list(result.x),
+                            'F_sol': F_solid_solution,
                             'F_sqs': F_sqs/num_str_atoms,
+                            'F_ord': F_ord/num_lat_atoms,
                             'F_rnd': F_rnd/num_lat_atoms,
                             'F_cvm': F_cvm/num_lat_atoms,
                             'distance': ord2disord_dist/2 - np.linalg.norm(result.x - corr_rnd)
