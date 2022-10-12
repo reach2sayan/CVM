@@ -2,7 +2,7 @@ import numpy as np
 import re
 import sys
 
-
+EPSILON = 1e-2
 class ClusterInfo:
     """
     Class containing the clusters information.
@@ -83,7 +83,7 @@ class ClusterInfo:
         try:
           for vmat in self.vmat.values():
             rho = vmat @ corrs
-            assert np.all([x >= 0.0 and x <= 1.0 for x in rho])
+            assert np.all([x >= 0.0 - EPSILON and x <= 1.0 + EPSILON for x in rho])
         except Exception:
           return False
         return True

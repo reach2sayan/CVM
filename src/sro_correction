@@ -468,6 +468,7 @@ if __name__ == '__main__':
             f"Optimised Free energy Gradient: {np.array2string(result.grad)}")
         print("Optimised Rhos:")
         clusters_full.print_rho(result.x)
+        print(f'Distance: {ord2disord_dist/2 - np.linalg.norm(result.x - corr_rnd)}')
         print("\n#################################################")
         F_solid_solution = F_sqs/num_str_atoms + \
             (F_cvm/num_lat_atoms - F_rnd/num_lat_atoms)
