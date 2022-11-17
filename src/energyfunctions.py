@@ -12,7 +12,7 @@ def F_efficient(corrs, mults_eci, multconfig_kb, all_vmat, vect_rhologrho, temp)
 def F_jacobian_efficient(corrs, mults_eci, multconfig_kb, all_vmat, vect_rhologrho, temp):
 
     dH = mults_eci
-    dS = all_vmat.T @ (multconfig_kb * (1 + np.log(np.abs(all_vmat @ corrs))))
+    dS = all_vmat.T @ (multconfig_kb * (1 + np.log(all_vmat @ corrs)))
 
     return dH + kB*temp*dS
 

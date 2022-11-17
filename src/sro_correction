@@ -176,7 +176,7 @@ if __name__ == '__main__':
                             help="Indicate maximum iterations for simplex procedure ",
                             )
     opt_params.add_argument('--earlystop',
-                            default=25,
+                            default=20,
                             type=int,
                             help="Number of steps to break out of trials if no new minima has been found.",
                             )
@@ -372,12 +372,22 @@ if __name__ == '__main__':
         corr_ord = result_ord.x
         E_ord = result_ord.fun
 
+    E_rnd = F(corr_rnd,
+              clusters_full.vmat,
+              clusters_full.kb,
+              clusters_full.clusters,
+              clusters_full.clustermult,
+              clusters_full.configmult,
+              0,
+              clusters_full.eci)
+
     print(f"Ordered correlation\t: {corr_ord}")
     print(f"Ordered Energy (in eV/atom)\t: {E_ord/num_lat_atoms}")
     print("Ordered Rho:\n")
     clusters_full.print_rho(corr_ord)
     print()
     print(f"Disordered correlation\t: {corr_rnd}")
+    print(f"Disordered Energy (in eV/atom)\t: {E_rnd/num_lat_atoms}")
     print("Disordered Rho:\n")
     clusters_full.print_rho(corr_rnd)
     ord2disord_dist = np.linalg.norm(corr_ord - corr_rnd)
@@ -395,6 +405,19 @@ if __name__ == '__main__':
     else:
         print('Using Analytical gradients and hessian...')
 
+    E_solid_solution = F_sqs/num_str_atoms + \
+            (E_ord/num_lat_atoms - E_rnd/num_lat_atoms)
+    results_sro.append({'structure': structure.split('/')[-1],
+                        'temperature': 0,
+                        'corrs': list(corr_ord),
+                        'F_sol': E_solid_solution,
+                        'F_sqs': F_sqs/num_str_atoms,
+                        'F_ord': E_ord/num_lat_atoms,
+                        'F_rnd': E_rnd/num_lat_atoms,
+                        'F_cvm': E_ord/num_lat_atoms,
+                        'distance': ord2disord_dist/2 - np.linalg.norm(corr_ord - corr_rnd)
+                       }
+                      )
     for T in custom_linspace(start=args.Tmin, stop=args.Tmax, step=args.Tstep):
 
         print(f'\nOptimising at temperature {T} K')

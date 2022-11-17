@@ -7,7 +7,8 @@ import numpy as np
 from scipy.optimize import minimize
 from scipy.optimize import BFGS
 from scipy.optimize import linprog
-from scan_disordered import get_initial_trial
+#from scan_disordered import get_initial_trial
+from random_structure_generation import get_random_structure
 
 
 def find_ordered(cluster_data, corr, method, options, fix_point=True, print_output=True,):
@@ -115,46 +116,58 @@ def fit(F,
         jac = '3-point'
         hess = BFGS()
 
-    steps_b4_mini = 0
+    earlystop = 0
     trial = 0
     found_optim_radius = False
+
+    first_trial = corrs_trial.copy()
     while trial < NUM_TRIALS:  # al in range(NUM_TRIALS):
 
-        if found_optim_radius:
-            if random_trial:
-                corrs_trial = np.array([*corrs_trial[:len(cluster_data.single_point_clusters)+1],*rng.uniform(low=-1,high=1,size=cluster_data.num_clusters - len(cluster_data.single_point_clusters) - 1)])
-                corrs_attempt = corrs_trial
-            else:
-                jitter = np.array([0,
-                                   *[0] *
-                                   len(cluster_data.single_point_clusters),
-                                   *rng.normal(0,
-                                               trial_variance,
-                                               cluster_data.num_clusters -
-                                               len(cluster_data.single_point_clusters) - 1
-                                              )
-                                  ]
-                                 )
-                corrs_attempt = corrs_trial+jitter
-            fattempt = F(corrs_attempt,
-                         mults_eci,
-                         multconfig_kb,
-                         all_vmat,
-                         vrhologrho,
-                         temp
-                        )
-        else:
-            fattempt, corrs_attempt = get_initial_trial(cluster_data=cluster_data,
-                                                        corr_rnd=corrs_trial,
-                                                        T=temp,
-                                                        ord2disord_dist=ord2disord_dist,
-                                                        constraint=constraint,
-                                                        trial_variance=trial_variance,
-                                                        num_trials=NUM_INIT_TRIALS,
-                                                        seed=seed
-                                                       )
+        if random_trial:
+            corrs_trial = np.array([*corrs_trial[:len(cluster_data.single_point_clusters)+1],
+                                    *rng.uniform(low=-1,
+                                                 high=1,
+                                                 size=cluster_data.num_clusters - len(cluster_data.single_point_clusters) - 1
+                                                )
+                                   ]
+                                  )
+            corrs_attempt = corrs_trial
+#            corrs_attempt = get_random_structure(
 
-        print(f'{trial}:', end='\r')
+        else:
+            jitter = np.array([0,
+                               *[0] *
+                               len(cluster_data.single_point_clusters),
+                               *rng.normal(0,
+                                           trial_variance,
+                                           cluster_data.num_clusters -
+                                           len(cluster_data.single_point_clusters) - 1
+                                          )
+                              ]
+                             )
+            corrs_attempt = corrs_trial+jitter
+
+        fattempt = F(corrs_attempt,
+                     mults_eci,
+                     multconfig_kb,
+                     all_vmat,
+                     vrhologrho,
+                     temp
+                    )
+#        if found_optim_radius:
+#
+#        else:
+#            fattempt, corrs_attempt = get_initial_trial(cluster_data=cluster_data,
+#                                                        corr_rnd=corrs_trial,
+#                                                        T=temp,
+#                                                        ord2disord_dist=ord2disord_dist,
+#                                                        constraint=constraint,
+#                                                        trial_variance=trial_variance,
+#                                                        num_trials=NUM_INIT_TRIALS,
+#                                                        seed=seed
+#                                                       )
+#
+        print(f'{trial}: {corrs_attempt}')
         try:
             temp_results = minimize(F,
                                     corrs_attempt,
@@ -181,22 +194,26 @@ def fit(F,
 
 
         if temp_results.fun > fattempt:
-            options['initial_tr_radius'] = options['initial_tr_radius']/10
+            found_optim_radius = False
+            corrs_trial = first_trial
+            options['initial_tr_radius'] = max(options['initial_tr_radius']/10,1e-12)
             if display_inter:
                 print(
                     f"Optimising Initial trust radius from {options['initial_tr_radius']*10:.2E} -->  {options['initial_tr_radius']:.2E}")
-                trial -= 1
 
 
         elif temp_results.constr_violation < constr_tol and temp_results.fun < result_value: 
-            found_optim_radius = True
+            if not found_optim_radius:
+                print('found optimal initial trust radius')
+                found_optim_radius = True
+
             try:
                 assert not np.all(np.isnan(temp_results.grad))
             except AssertionError:
                 print('Gradient blew up!! Incorrect solution. Moving on...')
                 continue
 
-            steps_b4_mini = 0
+            earlystop = 0
             result = temp_results
             result_value = temp_results.fun
             if display_inter:
@@ -209,20 +226,15 @@ def fit(F,
                 print(
                     f"Stop Status: {temp_results.status} | {temp_results.message}")
                 print('\n====================================\n')
-
-        elif result is None:
-            print('Setting results to the first optimization...')
-            result = temp_results
+            corrs_trial = temp_results.x
 
         else:
-            steps_b4_mini += 1
+            earlystop += 1
 
-            if steps_b4_mini > early_stopping_cond:
-                print(
-                    f'No improvement for {early_stopping_cond} steps. After half of max steps ({NUM_TRIALS}) were done.')
-                break
-
-
+        if earlystop > early_stopping_cond and trial > NUM_TRIALS/2:
+            print(
+                f'No improvement for consecutive {early_stopping_cond} steps. After half of total steps ({int(NUM_TRIALS/2)}) were done')
+            break
         trial += 1
 
     return result
