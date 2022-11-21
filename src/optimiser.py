@@ -7,8 +7,8 @@ import numpy as np
 from scipy.optimize import minimize
 from scipy.optimize import BFGS
 from scipy.optimize import linprog
-#from scan_disordered import get_initial_trial
-from random_structure_generation import get_random_structure
+from scan_disordered import get_random_structure
+import subprocess
 
 
 def find_ordered(cluster_data, corr, method, options, fix_point=True, print_output=True,):
@@ -60,27 +60,29 @@ def find_ordered(cluster_data, corr, method, options, fix_point=True, print_outp
     return result
 
 
-def fit(F,
-        cluster_data,
-        temp,
-        options,
-        jac,
-        hess,
-        NUM_TRIALS,
-        NUM_INIT_TRIALS,
-        bounds,
-        constraints,
-        constr_tol,
-        corrs_trial,
-        trial_variance,
-        random_trial=False,
-        display_inter=False,
-        approx_deriv=True,
-        seed=42,
-        early_stopping_cond=np.inf,
-        ord2disord_dist=0.0,
-        constraint=True
-       ):
+def fit_sro_correction(F,
+                       cluster_data,
+                       temp,
+                       options,
+                       jac,
+                       hess,
+                       NUM_TRIALS,
+                       bounds,
+                       constraints,
+                       constr_tol,
+                       corrs_trial,
+                       trial_variance,
+                       structure,
+                       lattice_file,
+                       clusters_file,
+                       random_trial=False,
+                       display_inter=False,
+                       approx_deriv=True,
+                       seed=42,
+                       early_stopping_cond=np.inf,
+                       ord2disord_dist=0.0,
+                       num_atoms_per_clus=1,
+                      ):
     """
     Functions takes in all required inputs :
         1. Functions and derivatives (if available),
@@ -91,9 +93,7 @@ def fit(F,
         and returns the minimised set of values for the particular section of the CVM correction pipeline.
     """
     rng = np.random.default_rng(seed)
-    result = None
-    result_value = 1e5
-    constr_viol = 1e-10
+    randgen = get_random_structure(structure)
 
     mult_arr = np.array(list(cluster_data.clustermult.values()))
     eci_arr = np.array(list(cluster_data.eci.values()))
@@ -118,21 +118,38 @@ def fit(F,
 
     earlystop = 0
     trial = 0
-    found_optim_radius = False
 
     first_trial = corrs_trial.copy()
+    ff_trial = F(first_trial,
+                 mults_eci,
+                 multconfig_kb,
+                 all_vmat,
+                 vrhologrho,
+                 temp
+                )
+
+    result = None
+    result_value = ff_trial
+    result_constr_viol = np.float64(0.0)
+    result_corr = first_trial.copy()
+    result_grad = np.zeros(first_trial.shape[0])
+
     while trial < NUM_TRIALS:  # al in range(NUM_TRIALS):
 
+        accepted = False
+        if display_inter:
+            print(f'Trial No.: {trial}')
         if random_trial:
-            corrs_trial = np.array([*corrs_trial[:len(cluster_data.single_point_clusters)+1],
-                                    *rng.uniform(low=-1,
-                                                 high=1,
-                                                 size=cluster_data.num_clusters - len(cluster_data.single_point_clusters) - 1
-                                                )
-                                   ]
-                                  )
-            corrs_attempt = corrs_trial
-#            corrs_attempt = get_random_structure(
+            next(randgen)
+            corrs_attempt = subprocess.run(['corrdump', '-c', f'-cf={structure}/{clusters_file}', f'-s={structure}/randstr.in', f'-l={structure}/{lattice_file}'],
+                                           stdout=subprocess.PIPE,
+                                           stderr=subprocess.PIPE,
+                                           check=True
+                                          )
+            # convert from bytes to string list
+            corrs_attempt = corrs_attempt.stdout.decode('utf-8').split('\t')[:-1]
+            corrs_attempt = np.array(corrs_attempt, dtype=np.float32)  # convert to arrays
+            assert cluster_data.check_result_validity(corrs_attempt)
 
         else:
             jitter = np.array([0,
@@ -147,6 +164,9 @@ def fit(F,
                              )
             corrs_attempt = corrs_trial+jitter
 
+        if trial == 0:
+            corrs_attempt = first_trial
+
         fattempt = F(corrs_attempt,
                      mults_eci,
                      multconfig_kb,
@@ -154,20 +174,7 @@ def fit(F,
                      vrhologrho,
                      temp
                     )
-#        if found_optim_radius:
-#
-#        else:
-#            fattempt, corrs_attempt = get_initial_trial(cluster_data=cluster_data,
-#                                                        corr_rnd=corrs_trial,
-#                                                        T=temp,
-#                                                        ord2disord_dist=ord2disord_dist,
-#                                                        constraint=constraint,
-#                                                        trial_variance=trial_variance,
-#                                                        num_trials=NUM_INIT_TRIALS,
-#                                                        seed=seed
-#                                                       )
-#
-        print(f'{trial}: {corrs_attempt}')
+
         try:
             temp_results = minimize(F,
                                     corrs_attempt,
@@ -185,27 +192,18 @@ def fit(F,
                                     constraints=constraints,
                                     bounds=bounds,
                                    )
-        except np.linalg.LinAlgError as linalg_err:
 
-            print(linalg_err)
-            print('trying a different starting point')
+        except Exception as err:
+
+            print(err)
+            print('something went wrong..restarting')
             trial -= 1
             continue
 
+        if temp_results is None:
+            print('WARNING: Optimisation failed')
 
-        if temp_results.fun > fattempt:
-            found_optim_radius = False
-            corrs_trial = first_trial
-            options['initial_tr_radius'] = max(options['initial_tr_radius']/10,1e-12)
-            if display_inter:
-                print(
-                    f"Optimising Initial trust radius from {options['initial_tr_radius']*10:.2E} -->  {options['initial_tr_radius']:.2E}")
-
-
-        elif temp_results.constr_violation < constr_tol and temp_results.fun < result_value: 
-            if not found_optim_radius:
-                print('found optimal initial trust radius')
-                found_optim_radius = True
+        elif temp_results.constr_violation < constr_tol and temp_results.fun < result_value:
 
             try:
                 assert not np.all(np.isnan(temp_results.grad))
@@ -213,23 +211,18 @@ def fit(F,
                 print('Gradient blew up!! Incorrect solution. Moving on...')
                 continue
 
-            earlystop = 0
-            result = temp_results
-            result_value = temp_results.fun
-            if display_inter:
-                print(f'Attempt Energy: {fattempt}')
-                print(f'Current Energy: {temp_results.fun}')
-                print(f'Current minimum correlations: {temp_results.x}')
-                print(f"Gradient: {np.array2string(temp_results.grad)}")
-                print(f"Constraint Violation: {temp_results.constr_violation}")
-                print(f"Current Trust Radius: {temp_results.tr_radius}")
-                print(
-                    f"Stop Status: {temp_results.status} | {temp_results.message}")
-                print('\n====================================\n')
-            corrs_trial = temp_results.x
+            if temp_results.fun > fattempt:
+                print('WARNING. Final energy higher than trial correlation')
 
-        else:
-            earlystop += 1
+            earlystop = 0
+            result_value = temp_results.fun
+            result_grad = temp_results.grad.copy()
+            result_corr = temp_results.x.copy()
+            result_constr_viol = temp_results.constr_violation
+
+            accepted = True
+
+        earlystop += 1
 
         if earlystop > early_stopping_cond and trial > NUM_TRIALS/2:
             print(
@@ -237,4 +230,21 @@ def fit(F,
             break
         trial += 1
 
-    return result
+        if display_inter and temp_results is not None:
+            print(f'Current attempt correlations: {corrs_attempt}')
+            print(f'Trial Validity: {cluster_data.check_result_validity(corrs_attempt)}')
+            print(f'Attempt Free Energy @ T = {temp}K : {fattempt/num_atoms_per_clus}')
+            print(f'Current Free Energy @ T = {temp}K : {temp_results.fun/num_atoms_per_clus}')
+            print(f'Current minimum correlations: {temp_results.x}')
+            print(f"Gradient: {np.array2string(temp_results.grad)}")
+            print(f"Constraint Violation: {temp_results.constr_violation}")
+            print(f"Current Trust Radius: {temp_results.tr_radius}")
+            print(
+                f"Stop Status: {temp_results.status} | {temp_results.message}")
+            print(f"Acccepted? : {accepted}")
+            print(f"Current Min Free Energy @ T = {temp}K : {result_value/num_atoms_per_clus}")
+            print(f"Current Best Contr. Viol : {result_constr_viol}")
+            print(f"Fully Disordered? : {np.allclose(result_corr,first_trial)}")
+            print('\n====================================\n')
+
+    return result_value, result_corr, result_grad, result_constr_viol

@@ -1,18 +1,19 @@
 import numpy as np
 import math
+import sys
 
 kB = 8.617330337217213e-05
 def F_efficient(corrs, mults_eci, multconfig_kb, all_vmat, vect_rhologrho, temp):
 
     H = mults_eci @ corrs
-    S = multconfig_kb @ vect_rhologrho(all_vmat @ corrs)
+    S = multconfig_kb @ vect_rhologrho((all_vmat @ corrs) + sys.float_info.epsilon)
 
     return H + kB*temp*S
 
 def F_jacobian_efficient(corrs, mults_eci, multconfig_kb, all_vmat, vect_rhologrho, temp):
 
     dH = mults_eci
-    dS = all_vmat.T @ (multconfig_kb * (1 + np.log(all_vmat @ corrs)))
+    dS = all_vmat.T @ (multconfig_kb * (1 + np.log(np.abs((all_vmat @ corrs) + sys.float_info.epsilon))))
 
     return dH + kB*temp*dS
 
