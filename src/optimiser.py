@@ -238,6 +238,9 @@ def fit_sro_correction(F,
             print(f'Current minimum correlations: {temp_results.x}')
             print(f"Gradient: {np.array2string(temp_results.grad)}")
             print(f"Constraint Violation: {temp_results.constr_violation}")
+            print(f"Constraint Penalty: {temp_results.constr_penalty}")
+            print(f"Barrier Parameter: {temp_results.barrier_parameter}")
+            print(f"Barrier Tolerance: {temp_results.barrier_tolerance}")
             print(f"Current Trust Radius: {temp_results.tr_radius}")
             print(
                 f"Stop Status: {temp_results.status} | {temp_results.message}")

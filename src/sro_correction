@@ -473,7 +473,7 @@ if __name__ == '__main__':
                    'initial_constr_penalty': args.initial_constr_penalty,
                    }
 
-        F_cvm, corr_opt, grad, constr_viol = opt.fit_sro_correction(F=F,
+        F_cvm, corr_opt, grad, constr_viol = opt.fit_sro_correction(F=F_efficient,
                                                                     cluster_data=clusters_full,
                                                                     temp=T,
                                                                     options=options,
