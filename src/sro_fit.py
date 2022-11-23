@@ -11,7 +11,7 @@ from sympy.parsing.sympy_parser import (
 from sympy import *
 
 eV2J = 96491.5666370759
-def sro_fit(func, results, coeff_in, inJoules=False):
+def sro_fit(func, results, coeff_in, inJoules=False,num_atoms=1):
     """
     Function to fit SRO correction as a function of T
     Inputs:
@@ -31,7 +31,7 @@ def sro_fit(func, results, coeff_in, inJoules=False):
         sys.exit(f"Data file {results.split('/')[-1]} not found...")
 
     xdata = np.array([item.get('temperature') for item in data if item.get('temperature') != 0])
-    ydata = np.array([item.get('F_cvm') - item.get('F_rnd') for item in data if item.get('temperature') != 0])
+    ydata = np.array([item.get('F_cvm') - item.get('F_rnd') for item in data if item.get('temperature') != 0])*num_atoms
     if inJoules:
         ydata = ydata*eV2J
     try:
@@ -40,7 +40,7 @@ def sro_fit(func, results, coeff_in, inJoules=False):
         print('File containing initial coefficients not found..taking defaults...')
         p0 = None
 
-    popt, pcov = curve_fit(f=func, xdata=xdata, ydata=ydata, p0=p0,method='lm', maxfev=10000000)
+    popt, pcov = curve_fit(f=func, xdata=xdata, ydata=ydata, p0=p0,method='dogbox', maxfev=10000000)
 
     for line in inspect.getsource(func).split('\n'):
         if 'return' in line:

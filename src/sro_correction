@@ -204,7 +204,7 @@ if __name__ == '__main__':
     opt_params.add_argument('--trial_variance',
                             default=0.001,
                             type=float,
-                            help="Trial Varianec",
+                            help="Trial Variance",
                             )
     opt_params.add_argument('--initial_tr_radius',
                             default=1,
@@ -261,6 +261,8 @@ if __name__ == '__main__':
         num_lat_atoms = len(lat_lines) - 4
     else:
         num_lat_atoms = len(lat_lines) - 6
+    ##WARNING
+    num_lat_atoms = 1
 
     # This part of the code only fits the SRO correction vs T part.
     # This section is repeated at the very end because I didn't want to write another wrapper for 20 lines of code.
@@ -540,7 +542,8 @@ if __name__ == '__main__':
         best_params, _, return_line, return_line_replaced, varnames = sro_fit(func=sro_model,
                                                                               results=f'{structure}/{args.out}',
                                                                               coeff_in=f'{structure}/{args.coeff_in}',
-                                                                              inJoules=args.inJoules
+                                                                              inJoules=args.inJoules,
+                                                                              num_atoms=num_str_atoms,
                                                                               )
         with open(f'{structure}/{args.coeff_out}-{tdate}', 'w') as fparams:
             fparams.write(return_line+'\n')
