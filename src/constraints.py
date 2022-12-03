@@ -72,8 +72,8 @@ class Constraints:
         linear_constraints = self.set_linear_constraints()
         singlet_constraints = self.set_singlet_constraints(corr_rnd)
 
-        constraints_sro = [*linear_constraints,
-                           *singlet_constraints,
+        constraints_sro = [*singlet_constraints,
+                           *linear_constraints,
                            {'fun': self.constraint_zero,
                             'type': 'eq'
                             },

@@ -186,6 +186,11 @@ if __name__ == '__main__':
                             type=int,
                             help="Number of steps to break out of trials if no new minima has been found.",
                             )
+    opt_params.add_argument('--basinhopping','-bh',
+                            action='store_true',
+                            default=False,
+                            help="Flag to turn on basinhopping global minimisation trials.",
+                           )
     opt_params.add_argument('--xtol',
                             default=1e-12,
                             type=float,
@@ -272,7 +277,7 @@ if __name__ == '__main__':
                                                                               results=f'{structure}/{args.out}',
                                                                               coeff_in=f'{structure}/{args.coeff_in}',
                                                                               inJoules=args.inJoules,
-                                                                              num_atoms=num_lat_atoms,
+                                                                              num_atoms=num_str_atoms,
                                                                               )
         with open(f'{structure}/{args.coeff_out}-{tdate}', 'w') as fparams:
             fparams.write(return_line+'\n')
@@ -474,29 +479,51 @@ if __name__ == '__main__':
                    'initial_constr_penalty': args.initial_constr_penalty,
                    }
 
-        F_cvm, corr_opt, grad, constr_viol = opt.fit_sro_correction(F=F_efficient,
-                                                                    cluster_data=clusters_full,
-                                                                    temp=T,
-                                                                    options=options,
-                                                                    jac=F_jacobian_efficient,
-                                                                    hess=F_hessian_efficient,
-                                                                    NUM_TRIALS=args.global_trials,
-                                                                    bounds=bounds_sro,
-                                                                    constraints=constraints_sro,
-                                                                    constr_tol=args.constr_tol,
-                                                                    corrs_trial=corr_rnd,
-                                                                    trial_variance=args.trial_variance,
-                                                                    structure=structure,
-                                                                    lattice_file=args.lat,
-                                                                    clusters_file=args.clusters,
-                                                                    random_trial=args.random_trial,
-                                                                    display_inter=not args.no_inter,
-                                                                    approx_deriv=args.approx_deriv,
-                                                                    seed=args.seed,
-                                                                    early_stopping_cond=args.earlystop,
-                                                                    ord2disord_dist=ord2disord_dist,
-                                                                    num_atoms_per_clus=num_lat_atoms,
-                                                                   )
+        if args.basinhopping:
+            F_cvm, corr_opt, grad, constr_viol = opt.fit_sro_correction_basinhopping(F=F_efficient,
+                                                                                     cluster_data=clusters_full,
+                                                                                     temp=T,
+                                                                                     options=options,
+                                                                                     jac=F_jacobian_efficient,
+                                                                                     hess=F_hessian_efficient,
+                                                                                     bounds=bounds_sro,
+                                                                                     constraints=constraints_sro,
+                                                                                     constr_tol=args.constr_tol,
+                                                                                     corrs_trial=corr_rnd,
+                                                                                     trial_variance=args.trial_variance,
+                                                                                     structure=structure,
+                                                                                     lattice_file=args.lat,
+                                                                                     clusters_file=args.clusters,
+                                                                                     random_trial=args.random_trial,
+                                                                                     display_inter=not args.no_inter,
+                                                                                     approx_deriv=args.approx_deriv,
+                                                                                     ord2disord_dist=ord2disord_dist,
+                                                                                     num_atoms_per_clus=num_lat_atoms,
+                                                                                    )
+        else:
+            F_cvm, corr_opt, grad, constr_viol = opt.fit_sro_correction(F=F_efficient,
+                                                                        cluster_data=clusters_full,
+                                                                        temp=T,
+                                                                        options=options,
+                                                                        jac=F_jacobian_efficient,
+                                                                        hess=F_hessian_efficient,
+                                                                        NUM_TRIALS=args.global_trials,
+                                                                        bounds=bounds_sro,
+                                                                        constraints=constraints_sro,
+                                                                        constr_tol=args.constr_tol,
+                                                                        corrs_trial=corr_rnd,
+                                                                        trial_variance=args.trial_variance,
+                                                                        structure=structure,
+                                                                        lattice_file=args.lat,
+                                                                        clusters_file=args.clusters,
+                                                                        random_trial=args.random_trial,
+                                                                        display_inter=not args.no_inter,
+                                                                        approx_deriv=args.approx_deriv,
+                                                                        seed=args.seed,
+                                                                        early_stopping_cond=args.earlystop,
+                                                                        ord2disord_dist=ord2disord_dist,
+                                                                        num_atoms_per_clus=num_lat_atoms,
+                                                                       )
         print(f"Disordered CVM Free energy (eV/atom) @ T = {T}K\t: {F_rnd/num_lat_atoms}")
         print(f"Ordered CVM Free energy (eV/atom) @ T = {T}K\t: {F_ord/num_lat_atoms}")
         print(
@@ -522,11 +549,6 @@ if __name__ == '__main__':
                             'distance': np.float64(ord2disord_dist/2) - np.linalg.norm(corr_opt - corr_rnd)
                             }
                           )
-
-#        corrcols = [f'corr {i}' for i in range(clusters_full.num_clusters)]
-#        for item in results_sro:
-#            for idx, corrnum in enumerate(corrcols):
-#                item[f'{coVrrnum}'] = item['corrs'][idx]
 
         with open(args.out, 'w') as fout:
             json.dump(results_sro, fout, indent="", cls=NumpyArrayEncoder)

@@ -4,11 +4,12 @@ Optimiser module for SRO Correction
 
 import itertools
 import numpy as np
-from scipy.optimize import minimize
+from scipy.optimize import minimize, basinhopping, shgo
 from scipy.optimize import BFGS
 from scipy.optimize import linprog
 from scan_disordered import get_random_structure
 import subprocess
+from basinhopping import BasinHoppingBounds, BasinHoppingStep, basin_hopping_callback
 
 
 def find_ordered(cluster_data, corr, method, options, fix_point=True, print_output=True,):
@@ -59,6 +60,137 @@ def find_ordered(cluster_data, corr, method, options, fix_point=True, print_outp
         f'WARNING: linear programming for ordered correlation search failed: {result.status} - {result.message}\nExiting...')
     return result
 
+def fit_sro_correction_basinhopping(F,
+                                    cluster_data,
+                                    temp,
+                                    options,
+                                    jac,
+                                    hess,
+                                    bounds,
+                                    constraints,
+                                    constr_tol,
+                                    corrs_trial,
+                                    trial_variance,
+                                    structure,
+                                    lattice_file,
+                                    clusters_file,
+                                    display_inter=False,
+                                    random_trial=False,
+                                    approx_deriv=True,
+                                    seed=42,
+                                    early_stopping_cond=np.inf,
+                                    ord2disord_dist=0.0,
+                                    num_atoms_per_clus=1,
+                                   ):
+    """
+    Functions takes in all required inputs :
+        1. Functions and derivatives (if available),
+        2. tolerances,
+        3. bounds and constraints,
+        4. Cluster Information
+        4. Other fitting parameters
+        and returns the minimised set of values for the particular section of the CVM correction pipeline.
+        """
+
+    mult_arr = np.array(list(cluster_data.clustermult.values()))
+    eci_arr = np.array(list(cluster_data.eci.values()))
+
+    mults_eci = mult_arr * eci_arr
+
+    all_vmat = np.vstack(list(cluster_data.vmat.values()))
+    mults_config = np.array(
+        list(itertools.chain.from_iterable(list(cluster_data.configmult.values()))))
+    all_kb = np.array(list(itertools.chain.from_iterable([[kb for _ in range(
+        len(cluster_data.configmult[idx]))] for idx, kb in cluster_data.kb.items()])))
+
+    multconfig_kb = mults_config * all_kb
+
+    assert all_vmat.shape == (len(multconfig_kb), len(mults_eci))
+
+    vrhologrho = np.vectorize(lambda rho: rho * np.log(np.abs(rho)))
+
+    if approx_deriv:
+        jac = '3-point'
+        hess = BFGS()
+
+    ff_trial = F(corrs_trial,
+                 mults_eci,
+                 multconfig_kb,
+                 all_vmat,
+                 vrhologrho,
+                 temp
+                )
+
+    result = None
+    result_value = ff_trial
+    result_constr_viol = np.float64(0.0)
+    result_corr = corrs_trial.copy()
+    result_grad = np.zeros(corrs_trial.shape[0])
+
+    args = (
+        mults_eci,
+        multconfig_kb,
+        all_vmat,
+        vrhologrho,
+        temp,
+    )
+
+    minimizer_kwargs = {'args' : args,
+                        'method': 'trust-constr',
+                        'options': options,
+                        'jac': jac, 'hess': hess,
+                        'constraints' : constraints,
+                        'bounds': bounds,
+                       }
+
+    bh_step = BasinHoppingStep(cluster_data,
+                               trial_variance = trial_variance,
+                               seed = seed,
+                               structure = structure,
+                               lattice_file = lattice_file,
+                               random_trial = random_trial,
+                               clusters_file = clusters_file,
+                              )
+    bh_accept = BasinHoppingBounds(all_vmat)
+
+    result = basinhopping(F,
+                          x0=corrs_trial,
+                          minimizer_kwargs = minimizer_kwargs,
+                          take_step = bh_step,
+                          accept_test = bh_accept,
+                          niter_success = early_stopping_cond,
+                          interval = 10,
+                          seed = seed,
+                          #callback = basin_hopping_callback,
+                          disp=True
+                         )
+
+    try:
+        assert result.lowest_optimization_result.constr_violation < constr_tol
+    except AssertionError:
+        print('Major Constrain violation')
+
+    result_value = result.fun
+    result_grad = result.lowest_optimization_result.grad.copy()
+    result_corr = result.x.copy()
+    result_constr_viol = result.lowest_optimization_result.constr_violation
+
+    if display_inter and result is not None:
+        print(result)
+#        print(f'Attempt Free Energy @ T = {temp}K : {fattempt/num_atoms_per_clus}')
+#        print(f'Optimised Free Energy @ T = {temp}K : {result.fun/num_atoms_per_clus}')
+#        print(f'Current minimum correlations: {result.x}')
+#        print(f"Gradient: {np.array2string(result.grad)}")
+#        print(f"Constraint Violation: {result.constr_violation}")
+#
+#        print(
+#            f"Stop Status: {temp_results.status} | {result.message}")
+#        print(f"Current Min Free Energy @ T = {temp}K : {result_value/num_atoms_per_clus}")
+#        print(f"Current Best Contr. Viol : {result_constr_viol}")
+#        print(f"Fully Disordered? : {np.allclose(result_corr,first_trial)}")
+#        print('\n====================================\n')
+
+    return result_value, result_corr, result_grad, result_constr_viol
 
 def fit_sro_correction(F,
                        cluster_data,
