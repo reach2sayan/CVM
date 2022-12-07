@@ -17,6 +17,6 @@ class CorrBounds:
             [1, *FIXED_CORRS, *[-1]*(self.num_clusters-1-self.num_single_clusters)])
         upper_bound = np.array(
             [1, *FIXED_CORRS, *[1]*(self.num_clusters-1-self.num_single_clusters)])
-        sro_bounds = Bounds(lower_bound, upper_bound,)  # keep_feasible=True)
+        sro_bounds = Bounds(lower_bound, upper_bound,)
 
         return sro_bounds

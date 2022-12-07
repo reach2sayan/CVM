@@ -7,6 +7,5 @@ The output of the parameters will be the in the order they show up in the functi
 """
 import numpy as np
 
-def sro_model(T, a0, a1, a2,):
-    return (np.exp(-a0*(T**(-1))) - 1)*(a1 + a2*(T**(-1)))
-
+def sro_model(T,a0,a1,a2,a3,b1,b2):
+    return a0 + a1*np.exp(b1*(T**(-1))) + a2*(T**(-1))*np.exp(b2*(T**(-1))) + a3*(T**(-1))

@@ -84,7 +84,9 @@ dmypy.json
 *.png
 *.gif
 *.json
-trial.csv
+*.svg
+*.wrap
+*.in
 *.orig
 BCC_A2
 FCC_A1

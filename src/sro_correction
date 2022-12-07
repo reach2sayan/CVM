@@ -357,17 +357,11 @@ if __name__ == '__main__':
 
     # This part of the code find the ordered correlation given the current ECI
     # Is skipped if no norm constraint if requried
-    if args.no_constraint:
-        print("Norm Constraint not activated.\n")
-    else:
-        print("Norm Constraint activated...\n")
-    if args.random_trial:
-        print('Random Trial Flag On.')
 
-    options = {'disp': bool(args.verbose),
-               'maxiter': args.maxiter_simplex,
-               'tol': args.xtol,
-               }
+    options_ordered = {'disp': bool(args.verbose),
+                       'maxiter': args.maxiter_simplex,
+                       'tol': args.xtol,
+                      }
 
     if Path(f"{structure}/ordered_correlations.out").is_file():
         print("File containing ordered correlations read.")
@@ -385,10 +379,25 @@ if __name__ == '__main__':
         result_ord = opt.find_ordered(cluster_data=clusters_full,
                                       corr=corr_rnd,
                                       method=args.linprog_method,
-                                      options=options,
+                                      options=options_ordered,
                                       )
         corr_ord = result_ord.x
         E_ord = result_ord.fun
+
+    if args.no_constraint:
+        print("Norm Constraint not activated.\n")
+    else:
+        print("Norm Constraint activated...\n")
+    if args.random_trial:
+        print('Random Trial Flag On.')
+
+    options = {'verbose': args.verbose,
+               'maxiter': args.maxiter,
+               'xtol': args.xtol,
+               'gtol': args.gtol,
+               'initial_tr_radius': args.initial_tr_radius,
+               'initial_constr_penalty': args.initial_constr_penalty,
+              }
 
     E_rnd = F(corr_rnd,
               clusters_full.vmat,
@@ -415,6 +424,10 @@ if __name__ == '__main__':
     if args.fit_ordered_only:
         sys.exit("Flag to find ordered state only detected. Exiting...")
 
+    constraints_sro = constraints.get_constraints_sro(ord2disord_dist, corr_rnd, args.no_constraint)
+    print(f"Constraints : \n {constraints_sro}")
+
+    bounds_sro = bounds.get_sro_bounds(FIXED_CORRS)
     print('Starting T optimisation...\n')
 
     # End of the calcualting ordered correlations
@@ -463,21 +476,6 @@ if __name__ == '__main__':
             f"Disordered CVM Free energy (eV/atom) @ T = {T}K\t: {F_rnd/num_lat_atoms}")
         print(f"Disordered Correlations @ T = {T}K\t: {corr_rnd}")
 
-        if args.no_constraint:
-            constraints_sro = constraints.get_constraints_ordered(corr_rnd)
-        else:
-            constraints_sro = constraints.get_constraints_sro(
-                ord2disord_dist, corr_rnd)
-
-        bounds_sro = bounds.get_sro_bounds(FIXED_CORRS)
-
-        options = {'verbose': args.verbose,
-                   'maxiter': args.maxiter,
-                   'xtol': args.xtol,
-                   'gtol': args.gtol,
-                   'initial_tr_radius': args.initial_tr_radius,
-                   'initial_constr_penalty': args.initial_constr_penalty,
-                   }
 
         if args.basinhopping:
             F_cvm, corr_opt, grad, constr_viol = opt.fit_sro_correction_basinhopping(F=F_efficient,
@@ -486,6 +484,7 @@ if __name__ == '__main__':
                                                                                      options=options,
                                                                                      jac=F_jacobian_efficient,
                                                                                      hess=F_hessian_efficient,
+                                                                                     NUM_TRIALS=args.global_trials,
                                                                                      bounds=bounds_sro,
                                                                                      constraints=constraints_sro,
                                                                                      constr_tol=args.constr_tol,
@@ -497,6 +496,8 @@ if __name__ == '__main__':
                                                                                      random_trial=args.random_trial,
                                                                                      display_inter=not args.no_inter,
                                                                                      approx_deriv=args.approx_deriv,
+                                                                                     seed=args.seed,
+                                                                                     early_stopping_cond=args.earlystop,
                                                                                      ord2disord_dist=ord2disord_dist,
                                                                                      num_atoms_per_clus=num_lat_atoms,
                                                                                     )

@@ -9,7 +9,7 @@ from scipy.optimize import BFGS
 from scipy.optimize import linprog
 from scan_disordered import get_random_structure
 import subprocess
-from basinhopping import BasinHoppingBounds, BasinHoppingStep, basin_hopping_callback
+from basinhopping_features import BasinHoppingBounds, BasinHoppingStep, BasinHoppingCallback
 
 
 def find_ordered(cluster_data, corr, method, options, fix_point=True, print_output=True,):
@@ -66,6 +66,7 @@ def fit_sro_correction_basinhopping(F,
                                     options,
                                     jac,
                                     hess,
+                                    NUM_TRIALS,
                                     bounds,
                                     constraints,
                                     constr_tol,
@@ -108,6 +109,7 @@ def fit_sro_correction_basinhopping(F,
     assert all_vmat.shape == (len(multconfig_kb), len(mults_eci))
 
     vrhologrho = np.vectorize(lambda rho: rho * np.log(np.abs(rho)))
+    #vrhologrho = np.vectorize(lambda rho: rho * np.log(rho))
 
     if approx_deriv:
         jac = '3-point'
@@ -121,7 +123,6 @@ def fit_sro_correction_basinhopping(F,
                  temp
                 )
 
-    result = None
     result_value = ff_trial
     result_constr_viol = np.float64(0.0)
     result_corr = corrs_trial.copy()
@@ -143,25 +144,38 @@ def fit_sro_correction_basinhopping(F,
                         'bounds': bounds,
                        }
 
-    bh_step = BasinHoppingStep(cluster_data,
-                               trial_variance = trial_variance,
-                               seed = seed,
+    bh_step = BasinHoppingStep(e_F = F,
+                               mults_eci = mults_eci,
+                               multconfig_kb = multconfig_kb,
+                               all_vmat = all_vmat,
+                               vrhologrho = vrhologrho,
+                               temp = temp,
+                               cluster_data = cluster_data,
                                structure = structure,
+                               num_atoms_per_clus = num_atoms_per_clus,
                                lattice_file = lattice_file,
-                               random_trial = random_trial,
                                clusters_file = clusters_file,
+                               stepsize = trial_variance,
+                               seed = seed,
+                               display_inter = display_inter,
+                               random_trial = random_trial,
                               )
+
     bh_accept = BasinHoppingBounds(all_vmat)
+
+    bh_callback = BasinHoppingCallback(cluster_data, temp, num_atoms_per_clus, corrs_trial)
 
     result = basinhopping(F,
                           x0=corrs_trial,
                           minimizer_kwargs = minimizer_kwargs,
+                          niter = NUM_TRIALS, 
+                          stepsize = trial_variance,
                           take_step = bh_step,
                           accept_test = bh_accept,
                           niter_success = early_stopping_cond,
-                          interval = 10,
+                          interval = 5,
                           seed = seed,
-                          #callback = basin_hopping_callback,
+                          callback = bh_callback,
                           disp=True
                          )
 
@@ -174,21 +188,6 @@ def fit_sro_correction_basinhopping(F,
     result_grad = result.lowest_optimization_result.grad.copy()
     result_corr = result.x.copy()
     result_constr_viol = result.lowest_optimization_result.constr_violation
-
-    if display_inter and result is not None:
-        print(result)
-#        print(f'Attempt Free Energy @ T = {temp}K : {fattempt/num_atoms_per_clus}')
-#        print(f'Optimised Free Energy @ T = {temp}K : {result.fun/num_atoms_per_clus}')
-#        print(f'Current minimum correlations: {result.x}')
-#        print(f"Gradient: {np.array2string(result.grad)}")
-#        print(f"Constraint Violation: {result.constr_violation}")
-#
-#        print(
-#            f"Stop Status: {temp_results.status} | {result.message}")
-#        print(f"Current Min Free Energy @ T = {temp}K : {result_value/num_atoms_per_clus}")
-#        print(f"Current Best Contr. Viol : {result_constr_viol}")
-#        print(f"Fully Disordered? : {np.allclose(result_corr,first_trial)}")
-#        print('\n====================================\n')
 
     return result_value, result_corr, result_grad, result_constr_viol
 
@@ -260,7 +259,6 @@ def fit_sro_correction(F,
                  temp
                 )
 
-    result = None
     result_value = ff_trial
     result_constr_viol = np.float64(0.0)
     result_corr = first_trial.copy()
@@ -307,30 +305,22 @@ def fit_sro_correction(F,
                      temp
                     )
 
-        try:
-            temp_results = minimize(F,
-                                    corrs_attempt,
-                                    method='trust-constr',
-                                    args=(
-                                        mults_eci,
-                                        multconfig_kb,
-                                        all_vmat,
-                                        vrhologrho,
-                                        temp,
-                                    ),
-                                    options=options,
-                                    jac=jac,
-                                    hess=hess,
-                                    constraints=constraints,
-                                    bounds=bounds,
-                                   )
-
-        except Exception as err:
-
-            print(err)
-            print('something went wrong..restarting')
-            trial -= 1
-            continue
+        temp_results = minimize(F,
+                                corrs_attempt,
+                                method='trust-constr',
+                                args=(
+                                    mults_eci,
+                                    multconfig_kb,
+                                    all_vmat,
+                                    vrhologrho,
+                                    temp,
+                                ),
+                                options=options,
+                                jac=jac,
+                                hess=hess,
+                                constraints=constraints,
+                                bounds=bounds,
+                               )
 
         if temp_results is None:
             print('WARNING: Optimisation failed')

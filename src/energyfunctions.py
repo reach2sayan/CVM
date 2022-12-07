@@ -14,6 +14,7 @@ def F_jacobian_efficient(corrs, mults_eci, multconfig_kb, all_vmat, vect_rhologr
 
     dH = mults_eci
     dS = all_vmat.T @ (multconfig_kb * (1 + np.log(np.abs((all_vmat @ corrs) + sys.float_info.epsilon))))
+#    dS = all_vmat.T @ (multconfig_kb * (1 + np.log((all_vmat @ corrs) + sys.float_info.epsilon)))
 
     return dH + kB*temp*dS
 
