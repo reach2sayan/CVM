@@ -91,5 +91,7 @@ dmypy.json
 BCC_A2
 FCC_A1
 results/
+reports/
 src/old_code
 species.in
+*.ipynb
